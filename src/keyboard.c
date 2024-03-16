@@ -62,54 +62,69 @@ void setupFakeKeyboardMouseDevice(struct uinput_user_dev *device, int fd)
 }
 
 
-void handleEventBtnFakeKeyboardMouseDevice(const SDL_Event *event, bool is_pressed)
+void handleEventBtnFakeKeyboardMouseDevice(const SDL_Event *event, bool pressed)
 {
     //config mode (i.e. not textinputinteractive_mode_active)
     switch (event->cbutton.button)
     {
     case SDL_CONTROLLER_BUTTON_DPAD_LEFT:
+        update_button(GBTN_DPAD_LEFT, pressed);
         break;
 
     case SDL_CONTROLLER_BUTTON_DPAD_UP:
+        update_button(GBTN_DPAD_UP, pressed);
         break;
 
     case SDL_CONTROLLER_BUTTON_DPAD_RIGHT:
+        update_button(GBTN_DPAD_RIGHT, pressed);
         break;
 
     case SDL_CONTROLLER_BUTTON_DPAD_DOWN:
+        update_button(GBTN_DPAD_DOWN, pressed);
         break;
 
     case SDL_CONTROLLER_BUTTON_A:
+        update_button(GBTN_A, pressed);
         break;
 
     case SDL_CONTROLLER_BUTTON_B:
+        update_button(GBTN_B, pressed);
         break;
 
     case SDL_CONTROLLER_BUTTON_X:
+        update_button(GBTN_X, pressed);
         break;
 
     case SDL_CONTROLLER_BUTTON_Y:
+        update_button(GBTN_Y, pressed);
         break;
 
     case SDL_CONTROLLER_BUTTON_LEFTSHOULDER:
+        update_button(GBTN_L1, pressed);
         break;
 
     case SDL_CONTROLLER_BUTTON_RIGHTSHOULDER:
+        update_button(GBTN_R1, pressed);
         break;
 
     case SDL_CONTROLLER_BUTTON_LEFTSTICK:
+        update_button(GBTN_L3, pressed);
         break;
 
     case SDL_CONTROLLER_BUTTON_RIGHTSTICK:
+        update_button(GBTN_R3, pressed);
         break;
 
     case SDL_CONTROLLER_BUTTON_GUIDE:
+        update_button(GBTN_GUIDE, pressed);
         break;
 
     case SDL_CONTROLLER_BUTTON_BACK: // aka select
+        update_button(GBTN_BACK, pressed);
         break;
 
     case SDL_CONTROLLER_BUTTON_START:
+        update_button(GBTN_START, pressed);
         break;
     } //switch
 }

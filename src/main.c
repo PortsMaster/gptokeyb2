@@ -119,6 +119,7 @@ int main(int argc, char* argv[])
         }
     }
 
+    config_finalise();
     config_dump();
 
     // SDL initialization and main loop
@@ -180,8 +181,8 @@ int main(int argc, char* argv[])
     {
         if (!SDL_WaitEvent(&event))
         {
-            printf("SDL_WaitEvent() failed: %s\n", SDL_GetError());
-            return -1;
+            fprintf(stderr, "SDL_WaitEvent() failed: %s\n", SDL_GetError());
+            break;
         }
 
         running = handleInputEvent(&event);

@@ -1,4 +1,4 @@
-# gptokeyb
+# gptokeyb2
 
 Gamepad to Keyboard/mouse/xbox360(gamepad) emulator
 

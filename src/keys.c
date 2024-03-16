@@ -245,10 +245,10 @@ const button_match button_codes[] = {
     {"back", GBTN_BACK},
     {"guide", GBTN_GUIDE},
 
-    {"dpad_up", GBTN_DPAD_UP},
-    {"dpad_down", GBTN_DPAD_DOWN},
-    {"dpad_left", GBTN_DPAD_LEFT},
-    {"dpad_right", GBTN_DPAD_RIGHT},
+    {"up", GBTN_DPAD_UP},
+    {"down", GBTN_DPAD_DOWN},
+    {"left", GBTN_DPAD_LEFT},
+    {"right", GBTN_DPAD_RIGHT},
 
     {"analog_left_up", GBTN_LEFT_ANALOG_UP},
     {"analog_left_down", GBTN_LEFT_ANALOG_DOWN},

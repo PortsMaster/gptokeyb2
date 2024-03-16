@@ -137,6 +137,8 @@ enum
     ACT_MOUSE_SLOW,
     ACT_MOUSE_MOVE,
     ACT_STATE_POP,
+    // Make sure these are last, that way we can check for
+    // (action >= ACT_STATE_HOLD) to see if it needs a cfg_name
     ACT_STATE_HOLD,
     ACT_STATE_PUSH,
     ACT_STATE_SET,
@@ -172,9 +174,27 @@ struct _gptokeyb_config
 };
 
 
+#define GPTK_REPEAT_DELAY 1000
+#define GPTK_REPEAT_DELAY 1000
+
 typedef struct
 {
-    short button[GBTN_MAX];
+    bool pressed[GBTN_MAX];
+    bool last_pressed[GBTN_MAX];
+
+    bool pop_held[GBTN_MAX];
+
+    bool mouse_slow;
+
+    Uint64 held_for[GBTN_MAX];
+    bool want_repeat[GBTN_MAX];
+    Uint64 last_repeat[GBTN_MAX];
+
+    int hotkey;
+    bool running;
+
+    Uint64 repeat_delay;
+    Uint64 repeat_rate;
 } gptokeyb_state;
 
 
@@ -204,8 +224,9 @@ extern const keyboard_values keyboard_codes[];
 extern const button_match button_codes[];
 
 extern gptokeyb_config *root_config;
-extern gptokeyb_config *config_stack[CFG_STACK_MAX];
+extern gptokeyb_config *config_stack[];
 extern gptokeyb_config *default_config;
+extern gptokeyb_state current_state;
 extern int gptokeyb_config_depth;
 
 // stuff
@@ -217,6 +238,7 @@ extern bool config_mode;
 void config_init();
 void config_quit();
 void config_dump();
+void config_finalise();
 
 gptokeyb_config *config_find(const char *name);
 gptokeyb_config *config_create(const char *name);
@@ -238,6 +260,8 @@ bool strcasestartswith(const char *str, const char *suffix);
 int strcasecmp(const char *s1, const char *s2);
 int strncasecmp(const char *s1, const char *s2, size_t n);
 
+bool process_kill();
+
 // from og gptokeyb
 void emit(int type, int code, int val);
 void emitMouseMotion(int x, int y);
@@ -245,6 +269,18 @@ void emitAxisMotion(int code, int value);
 void emitTextInputKey(int code, bool uppercase);
 void emitKey(int code, bool is_pressed, int modifier);
 void handleAnalogTrigger(bool is_triggered, bool *was_triggered, int key, int modifier);
+
+// state.c
+bool is_pressed(int btn);
+bool was_pressed(int btn);
+bool was_released(int btn);
+
+void state_init();
+void state_update();
+
+void push_state(gptokeyb_config *);
+void set_state(gptokeyb_config *);
+void pop_state();
 
 // event.c
 bool handleInputEvent(const SDL_Event *event);

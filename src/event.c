@@ -37,6 +37,7 @@
 
 #include "gptokeyb2.h"
 
+
 bool handleInputEvent(const SDL_Event *event)
 {
     // Main input loop

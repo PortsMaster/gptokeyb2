@@ -112,10 +112,10 @@ const char *act_names[] = {
     "parent",
     "mouse_slow",
     "mouse_move",
+    "pop_state",
     "hold_state",
-    "state_push",
-    "state_set",
-    "state_pop",
+    "push_state",
+    "set_state",
 };
 
 
@@ -220,6 +220,9 @@ void config_dump()
             if (current->button[btn].action != 0)
                 printf(" %s %s", act_names[current->button[btn].action], current->button[btn].cfg_name);
 
+            if (current->button[btn].repeat)
+                printf(" repeat");
+
             printf("\n");
         }
 
@@ -231,6 +234,17 @@ void config_dump()
 }
 
 
+void config_overlay_clear(gptokeyb_config *current)
+{
+    for (int btn=0; btn < GBTN_MAX; btn++)
+    {
+        current->button[btn].keycode = 0;
+        current->button[btn].modifier = 0;
+        current->button[btn].action = ACT_NONE;
+        current->button[btn].repeat = false;
+    }
+}
+
 void config_overlay_parent(gptokeyb_config *current)
 {
     for (int btn=0; btn < GBTN_MAX; btn++)
@@ -238,6 +252,7 @@ void config_overlay_parent(gptokeyb_config *current)
         current->button[btn].keycode = 0;
         current->button[btn].modifier = 0;
         current->button[btn].action = ACT_PARENT;
+        current->button[btn].repeat = false;
     }
 }
 
@@ -264,6 +279,7 @@ void config_overlay_named(gptokeyb_config *current, const char *name)
         current->button[btn].keycode = other->button[btn].keycode;
         current->button[btn].modifier = other->button[btn].modifier;
         current->button[btn].action = other->button[btn].action;
+        current->button[btn].repeat = other->button[btn].repeat;
 
         if (current->button[btn].action >= ACT_STATE_HOLD)
         {
@@ -337,8 +353,12 @@ gptokeyb_config *config_create(const char *name)
         strncpy(result->name, name, MAX_CONTROL_NAME-1);
     }
 
-    result->next = root_config->next;
-    root_config->next = result;
+    // add it to the linked list.
+    gptokeyb_config *last_config = root_config;
+    while (last_config->next != NULL)
+        last_config = last_config->next;
+
+    last_config->next = result;
 
     // GPTK2_DEBUG("config_create: %s\n", result->name);
     return result;
@@ -406,6 +426,7 @@ void set_btn_config(gptokeyb_config *config, int btn, const char *name, const ch
 
     // GPTK2_DEBUG(">>> '%s'\n", value);
     // GPTK2_DEBUG("    '%s'\n", temp_buffer);
+
     bool first_run = true;
     token = strtok(temp_buffer, "\t");
 
@@ -520,14 +541,54 @@ void set_btn_config(gptokeyb_config *config, int btn, const char *name, const ch
         }
         else if (strcasecmp(token, "repeat") == 0)
         {
+            GPTK2_DEBUG("%s: repeatedly :D\n", gbtn_names[btn]);
             if (btn >= GBTN_MAX)
             {
                 for (int sbtn=special_button_min(btn); sbtn < special_button_max(btn); sbtn++)
+                {
+                    GPTK2_DEBUG("%s: repeatedly :D\n", gbtn_names[sbtn]);
                     config->button[sbtn].repeat = true;
+                }
             }
             else
             {
                 config->button[btn].repeat = true;
+            }
+        }
+        else if (strcasecmp(token, "parent") == 0)
+        {
+            if (btn >= GBTN_MAX)
+            {
+                for (int sbtn=special_button_min(btn); sbtn < special_button_max(btn); sbtn++)
+                {
+                    config->button[sbtn].keycode = 0;
+                    config->button[sbtn].modifier = 0;
+                    config->button[sbtn].action = ACT_PARENT;
+                }
+            }
+            else
+            {
+                config->button[btn].keycode = 0;
+                config->button[btn].modifier = 0;
+                config->button[btn].action = ACT_PARENT;
+            }
+        }
+        else if (strcasecmp(token, "clear") == 0)
+        {
+            if (btn >= GBTN_MAX)
+            {
+                for (int sbtn=special_button_min(btn); sbtn < special_button_max(btn); sbtn++)
+                {
+                    config->button[sbtn].keycode = 0;
+                    config->button[sbtn].modifier = 0;
+                    config->button[sbtn].action = ACT_NONE;
+                }
+            }
+            else
+            {
+                config->button[btn].keycode = 0;
+                config->button[btn].modifier = 0;
+                config->button[btn].action = ACT_NONE;
             }
         }
         else
@@ -650,7 +711,7 @@ static int config_ini_handler(
             else if (strcasecmp(value, "clear") == 0)
             {
                 GPTK2_DEBUG("overlay = clear\n");
-                // DO NOTHING
+                config_overlay_clear(config->current_config);
             }
             else if (strlen(value) > 0)
             {
@@ -694,7 +755,7 @@ static int config_ini_handler(
             else if (strcasecmp(value, "clear") == 0)
             {
                 GPTK2_DEBUG("overlay = clear\n");
-                // DO NOTHING
+                config_overlay_parent(config->current_config);
             }
             else if (strlen(value) > 0)
             {
@@ -711,7 +772,6 @@ static int config_ini_handler(
             GPTK2_DEBUG("X: %s: %s\n", name, value);
         }
     }
-
     else
     {
         GPTK2_DEBUG("?: %s: %s\n", name, value);
@@ -741,4 +801,67 @@ int config_load(const char *file_name, bool config_only)
     }
 
     return 0;
+}
+
+
+void config_finalise()
+{   // this will check all the configs loaded and link the cfg_name to cfg_maps
+    gptokeyb_config *current=root_config;
+    gptokeyb_config *other;
+
+    while (current != NULL)
+    {
+        GPTK2_DEBUG("Checking %s\n", current->name);
+        int seen_mouse_slow = -1;
+
+        if (current->map_check)
+        {
+            for (int btn=0; btn < GBTN_MAX; btn++)
+            {
+                if (current->button[btn].action == ACT_MOUSE_SLOW)
+                {
+                    if (seen_mouse_slow >= 0)
+                    {
+                        fprintf(stderr, "%s: '%s = mouse_slow', is set on multiple buttons, previous button was '%s', this can cause issues.\n",
+                            current->name,
+                            gbtn_names[btn],
+                            gbtn_names[seen_mouse_slow]);
+                    }
+
+                    seen_mouse_slow = btn;
+                }
+
+                if (current->button[btn].action >= ACT_STATE_HOLD)
+                {
+                    current->button[btn].cfg_map = config_find(current->button[btn].cfg_name);
+
+                    if (current->button[btn].cfg_map == current)
+                    {
+                        fprintf(stderr, "%s: \"%s = %s %s\" is linking to the same map, clearing action.\n",
+                            current->name,
+                            gbtn_names[btn],
+                            act_names[current->button[btn].action],
+                            current->button[btn].cfg_name);
+
+                        current->button[btn].cfg_map = NULL;
+                        current->button[btn].action = ACT_NONE;
+                    }
+                    else if (current->button[btn].cfg_map == NULL)
+                    {
+                        fprintf(stderr, "%s: \"%s = %s %s\" is an unknown map, clearing action.\n",
+                            current->name,
+                            gbtn_names[btn],
+                            act_names[current->button[btn].action],
+                            current->button[btn].cfg_name);
+
+                        current->button[btn].action = ACT_NONE;
+                    }
+                }
+            }
+
+            current->map_check = false;
+        }
+
+        current = current->next;
+    }
 }

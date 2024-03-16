@@ -64,6 +64,15 @@
 #define GPTK2_DEBUG(fmt, ...) ((void)0)
 #endif
 
+#ifndef SDL_DEFAULT_REPEAT_DELAY
+#define SDL_DEFAULT_REPEAT_DELAY 500
+#endif
+
+#ifndef SDL_DEFAULT_REPEAT_INTERVAL
+#define SDL_DEFAULT_REPEAT_INTERVAL 30
+#endif
+
+
 // It's a lie, but it is not cake
 #define XBOX_CONTROLLER_NAME "Microsoft X-Box 360 pad"
 
@@ -174,8 +183,6 @@ struct _gptokeyb_config
 };
 
 
-#define GPTK_REPEAT_DELAY 1000
-#define GPTK_REPEAT_DELAY 1000
 
 typedef struct
 {
@@ -186,11 +193,11 @@ typedef struct
 
     bool mouse_slow;
 
-    Uint64 held_for[GBTN_MAX];
-    bool want_repeat[GBTN_MAX];
-    Uint64 last_repeat[GBTN_MAX];
+    bool in_repeat[GBTN_MAX];
+    Uint32 held_since[GBTN_MAX];
+    Uint32 next_repeat[GBTN_MAX];
 
-    int hotkey;
+    int hotkey_gbtn;
     bool running;
 
     Uint64 repeat_delay;
@@ -223,6 +230,9 @@ typedef struct {
 extern const keyboard_values keyboard_codes[];
 extern const button_match button_codes[];
 
+extern const char *gbtn_names[];
+extern const char *act_names[];
+
 extern gptokeyb_config *root_config;
 extern gptokeyb_config *config_stack[];
 extern gptokeyb_config *default_config;
@@ -233,6 +243,11 @@ extern int gptokeyb_config_depth;
 extern int uinp_fd;
 extern bool xbox360_mode;
 extern bool config_mode;
+
+extern bool want_pc_quit;
+extern bool want_kill;
+extern bool want_sudo;
+extern char kill_process_name[];
 
 // config.c
 void config_init();
@@ -249,6 +264,7 @@ int config_load(const char *file_name, bool config_only);
 const keyboard_values *find_keyboard(const char *key);
 const char *find_keycode(short keycode);
 const button_match *find_button(const char *key);
+void set_hotkey(int gbtn);
 
 // util.c -- CHATGPT
 bool strendswith(const char *str, const char *suffix);
@@ -275,6 +291,8 @@ bool is_pressed(int btn);
 bool was_pressed(int btn);
 bool was_released(int btn);
 
+void update_button(int btn, bool pressed);
+
 void state_init();
 void state_update();
 
@@ -283,7 +301,7 @@ void set_state(gptokeyb_config *);
 void pop_state();
 
 // event.c
-bool handleInputEvent(const SDL_Event *event);
+void handleInputEvent(const SDL_Event *event);
 
 // keyboard.c
 void setupFakeKeyboardMouseDevice(struct uinput_user_dev *device, int fd);

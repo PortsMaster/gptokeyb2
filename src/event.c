@@ -38,7 +38,7 @@
 #include "gptokeyb2.h"
 
 
-bool handleInputEvent(const SDL_Event *event)
+void handleInputEvent(const SDL_Event *event)
 {
     // Main input loop
     switch (event->type)
@@ -46,16 +46,14 @@ bool handleInputEvent(const SDL_Event *event)
     case SDL_CONTROLLERBUTTONDOWN:
     case SDL_CONTROLLERBUTTONUP:
         {
-            const bool is_pressed = event->type == SDL_CONTROLLERBUTTONDOWN;
+            const bool pressed = event->type == SDL_CONTROLLERBUTTONDOWN;
 
             if (xbox360_mode)
             {
-                handleEventBtnFakeXbox360Device(event, is_pressed);
+                handleEventBtnFakeXbox360Device(event, pressed);
             }
-            else
-            {
-                handleEventBtnFakeKeyboardMouseDevice(event, is_pressed);
-            }
+
+            handleEventBtnFakeKeyboardMouseDevice(event, pressed);
         }
         break;
 
@@ -96,9 +94,7 @@ bool handleInputEvent(const SDL_Event *event)
         break;
 
     case SDL_QUIT:
-        return false;
-        break;
+        current_state.running = false;
+        return;
     }
-
-    return true;
 }

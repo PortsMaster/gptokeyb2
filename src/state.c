@@ -37,17 +37,19 @@
 
 #include "gptokeyb2.h"
 
-extern gptokeyb_state current_state;
+gptokeyb_state current_state;
 
-gptokeyb_config *config_stack[CFG_STACK_MAX];
-int gptokeyb_config_depth = 0;
 
 void state_init()
 {
     memset((void*)&current_state, '\0', sizeof(gptokeyb_state));
 
-    current_state.hotkey = GBTN_BACK;
+    set_hotkey(GBTN_BACK);
+
     current_state.running = true;
+
+    current_state.repeat_delay = SDL_DEFAULT_REPEAT_DELAY;
+    current_state.repeat_rate = SDL_DEFAULT_REPEAT_INTERVAL;
 }
 
 void push_state(gptokeyb_config *new_config)
@@ -62,12 +64,18 @@ void push_state(gptokeyb_config *new_config)
         return;
     }
 
+    for (int i = 0; i < gptokeyb_config_depth; i++) {
+        GPTK2_DEBUG("  ");
+    }
     GPTK2_DEBUG("push_state: %s\n", new_config->name);
-    config_stack[gptokeyb_config_depth++] = new_config;
+    config_stack[++gptokeyb_config_depth] = new_config;
 }
 
 void set_state(gptokeyb_config *new_config)
 {
+    for (int i = 0; i < gptokeyb_config_depth; i++) {
+        GPTK2_DEBUG("  ");
+    }
     GPTK2_DEBUG("set_state: %s\n", new_config->name);
     config_stack[gptokeyb_config_depth] = new_config;
 }
@@ -77,6 +85,9 @@ void pop_state()
     if (gptokeyb_config_depth == 0)
         return;
 
+    for (int i = 0; i < gptokeyb_config_depth; i++) {
+        GPTK2_DEBUG("  ");
+    }
     GPTK2_DEBUG("pop_state: %s\n", config_stack[gptokeyb_config_depth]->name);
     gptokeyb_config_depth--;
 }
@@ -106,14 +117,12 @@ bool was_released(int btn)
     return (!current_state.pressed[btn] && current_state.last_pressed[btn]);
 }
 
-Uint64 held_for(int btn)
+Uint32 held_for(int btn)
 {
-    Uint64 current_ticks = SDL_GetTicks64();
-
     if (!is_pressed(btn))
         return 0;
 
-    return (current_ticks - current_state.held_since[btn])
+    return (SDL_GetTicks() - current_state.held_since[btn]);
 }
 
 void state_update()
@@ -121,9 +130,9 @@ void state_update()
      *
      * This handles things like START + SELECT to quit, button repeating.
      */
-    Uint64 current_ticks = SDL_GetTicks64();
+    Uint32 current_ticks = SDL_GetTicks();
 
-    if (is_pressed(GBTN_START) && is_pressed(current_state.hotkey))
+    if (is_pressed(GBTN_START) && is_pressed(current_state.hotkey_gbtn))
     {
         if (process_kill())
             current_state.running = false;
@@ -136,13 +145,13 @@ void state_update()
 
     for (int btn=0; btn < GBTN_MAX; btn++)
     {
-        if (!current_state.want_repeat[btn])
+        if (!current_state.in_repeat[btn])
             continue;
 
         if (!is_pressed(btn))
             continue;
 
-        if (current_state.next_repeat[btn] < current_ticks)
+        if (!SDL_TICKS_PASSED(current_ticks, current_state.next_repeat[btn]))
             continue;
 
         current_state.next_repeat[btn] = (current_ticks + current_state.repeat_rate);
@@ -151,6 +160,7 @@ void state_update()
         update_button(btn, false);
 
         // press button
+        current_state.in_repeat[btn] = true;
         current_state.last_pressed[btn] = false;
         update_button(btn, true);
     }
@@ -180,6 +190,8 @@ const BUTTON_MAP *state_button(int btn)
 
 void update_button(int btn, bool pressed)
 {
+    Uint32 current_ticks = SDL_GetTicks();
+
     gptokeyb_config *config = config_stack[gptokeyb_config_depth];
 
     const BUTTON_MAP *button = state_button(btn);
@@ -188,7 +200,11 @@ void update_button(int btn, bool pressed)
         return;
 
     current_state.pressed[btn] = pressed;
-    current_state
+    if (!current_state.in_repeat[btn])
+    {
+        current_state.held_since[btn] = current_ticks;
+    }
+
     if (was_pressed(btn))
     {
         if (button->action == ACT_STATE_POP)
@@ -209,12 +225,18 @@ void update_button(int btn, bool pressed)
         {
             current_state.mouse_slow = true;
         }
-        else if (button->repeat)
+        else if (button->repeat && !current_state.in_repeat[btn])
         {
+            current_state.in_repeat[btn] = true;
+            current_state.next_repeat[btn] = (current_ticks + current_state.repeat_delay);
+        }
 
+        if (button->keycode != 0)
+        {
+            GPTK2_DEBUG("RELEASE '%s' -> '%s'\n", gbtn_names[btn], find_keycode(button->keycode));
+            emitKey(button->keycode, true, button->modifier);
         }
     }
-
     else if (was_released(btn))
     {
         if (current_state.pop_held[btn])
@@ -225,6 +247,13 @@ void update_button(int btn, bool pressed)
         else if (button->action == ACT_MOUSE_SLOW)
         {
             current_state.mouse_slow = false;
+        }
+
+        current_state.in_repeat[btn] = false;
+        if (button->keycode != 0)
+        {
+            GPTK2_DEBUG("PRESS   '%s' -> '%s'\n", gbtn_names[btn], find_keycode(button->keycode));
+            emitKey(button->keycode, false, button->modifier);
         }
     }
 }

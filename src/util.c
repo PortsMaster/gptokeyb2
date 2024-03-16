@@ -126,40 +126,40 @@ void emit(int type, int code, int val)
     write(uinp_fd, &ev, sizeof(ev));
 }
 
-void emitModifier(bool is_pressed, int modifier)
+void emitModifier(bool pressed, int modifier)
 {
     if ((modifier & MOD_SHIFT) != 0)
     {
-        emit(EV_KEY, KEY_LEFTSHIFT, is_pressed ? 1 : 0);
+        emit(EV_KEY, KEY_LEFTSHIFT, pressed ? 1 : 0);
         emit(EV_SYN, SYN_REPORT, 0);        
     }
 
     if ((modifier & MOD_ALT) != 0)
     {
-        emit(EV_KEY, KEY_LEFTALT, is_pressed ? 1 : 0);
+        emit(EV_KEY, KEY_LEFTALT, pressed ? 1 : 0);
         emit(EV_SYN, SYN_REPORT, 0);        
     }
 
     if ((modifier & MOD_CTRL) != 0)
     {
-        emit(EV_KEY, KEY_LEFTCTRL, is_pressed ? 1 : 0);
+        emit(EV_KEY, KEY_LEFTCTRL, pressed ? 1 : 0);
         emit(EV_SYN, SYN_REPORT, 0);        
     }
 }
 
-void emitKey(int code, bool is_pressed, int modifier)
+void emitKey(int code, bool pressed, int modifier)
 {
     if (code == 0)
         return;
 
-    if ((modifier != 0) && is_pressed)
-        emitModifier(is_pressed, modifier);
+    if ((modifier != 0) && pressed)
+        emitModifier(pressed, modifier);
 
-    emit(EV_KEY, code, is_pressed ? 1 : 0);
+    emit(EV_KEY, code, pressed ? 1 : 0);
     emit(EV_SYN, SYN_REPORT, 0);
 
-    if ((modifier != 0) && !(is_pressed))
-        emitModifier(is_pressed, modifier);
+    if ((modifier != 0) && !(pressed))
+        emitModifier(pressed, modifier);
 }
 
 void emitTextInputKey(int code, bool uppercase)
@@ -219,5 +219,97 @@ void handleAnalogTrigger(bool is_triggered, bool *was_triggered, int key, int mo
 }
 
 
+#define KILL_BUFFER 1024
+
+bool process_with_pkill(const char *process_name, bool use_sudo)
+{
+    char temp_buffer[KILL_BUFFER];
+
+    if (use_sudo)
+        snprintf(temp_buffer, KILL_BUFFER, "sudo pkill -9 '%s'", process_name);
+    else
+        snprintf(temp_buffer, KILL_BUFFER, "pkill -9 '%s'", process_name);
+
+    // Execute the command
+    int status = system(temp_buffer);
+
+    // Check if the command executed successfully
+    if (status == -1)
+        return false;
+
+    return true;
+}
 
 
+bool process_with_kill(const char *process_name, bool use_sudo)
+{
+    char temp_buffer[KILL_BUFFER];
+    bool status = false;
+
+    snprintf(temp_buffer, KILL_BUFFER, "ps | grep '%s' | grep -v grep | awk '{print $1}'", process_name);
+
+    FILE *fp = popen(temp_buffer, "r");
+    if (fp == NULL) {
+        perror("Error executing ps command");
+        return false;
+    }
+
+    char pid_str[32];
+
+    if (fgets(pid_str, sizeof(pid_str), fp) != NULL)
+    {
+        // Trim the newline character
+        pid_str[strcspn(pid_str, "\n")] = 0;
+        
+        // Convert string to integer
+        int pid = atoi(pid_str);
+
+        // Kill the process
+        if (want_sudo)
+            snprintf(temp_buffer, KILL_BUFFER, "kill -9 %d", pid);
+        else
+            snprintf(temp_buffer, KILL_BUFFER, "kill -9 %d", pid);
+
+        int status = system(temp_buffer);
+        if (status == -1)
+        {
+            perror("Error executing kill command");
+        }
+        else
+        {
+            status = true;
+            printf("Process with name '%s' and PID %d killed successfully.\n", process_name, pid);
+        }
+    }
+    else
+    {
+        printf("No process with name '%s' found.\n", process_name);
+    }
+
+    pclose(fp);
+
+    return status;
+}
+
+bool process_with_pc_quit()
+{
+    emitKey(KEY_F4, true, KEY_LEFTALT);
+    SDL_Delay(15);
+
+    emitKey(KEY_F4, false, KEY_LEFTALT);
+    SDL_Delay(15);
+}
+
+bool process_kill()
+{
+    if (want_pc_quit)
+        process_with_pc_quit();
+
+    if (strlen(kill_process_name) == 0)
+        return false;
+
+    if (want_kill)
+        return process_with_kill(kill_process_name, want_sudo);
+
+    return process_with_pkill(kill_process_name, want_sudo);
+}

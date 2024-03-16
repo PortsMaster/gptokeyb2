@@ -30,10 +30,7 @@ include_directories(
   )
 
 
-set(EXTRA_CFLAGS )
-if (CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
-  set(EXTRA_CFLAGS "${EXTRA_CXXFLAGS} -Wall -g3 -O0")
-endif()
+set(EXTRA_CFLAGS "${EXTRA_CFLAGS} -Wall -g3 -O0")
 
 add_executable(gptokeyb2
     src/config.c

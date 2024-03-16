@@ -194,11 +194,13 @@ void config_dump()
 {   // Dump all the current configs.
     gptokeyb_config *current = root_config;
 
+    printf("###########################################\n");
+    printf("# CONFIG DUMP\n");
+    printf("\n");
+
     while (current != NULL)
     {
-        printf("-------------------------------------------\n");
-        printf("- %s\n", current->name);
-        printf("\n");
+        printf("[%s]\n", current->name);
         for (int btn=0; btn < GBTN_MAX; btn++)
         {
             printf("%s =", gbtn_names[btn]);
@@ -224,13 +226,16 @@ void config_dump()
                 printf(" repeat");
 
             printf("\n");
+
+            if ((btn == GBTN_Y) || (btn == GBTN_R3) || (btn == GBTN_GUIDE) || (btn == GBTN_DPAD_RIGHT) || (btn == GBTN_LEFT_ANALOG_RIGHT))
+                printf("\n");
         }
 
         current = current->next;
         printf("\n");
     }
 
-    printf("-------------------------------------------\n");
+    printf("###########################################\n");
 }
 
 
@@ -272,7 +277,7 @@ void config_overlay_named(gptokeyb_config *current, const char *name)
         return;
     }
 
-    fprintf(stderr, "overlay %s: \n", other->name);
+    // fprintf(stderr, "overlay %s: \n", other->name);
 
     for (int btn=0; btn < GBTN_MAX; btn++)
     {
@@ -541,12 +546,10 @@ void set_btn_config(gptokeyb_config *config, int btn, const char *name, const ch
         }
         else if (strcasecmp(token, "repeat") == 0)
         {
-            GPTK2_DEBUG("%s: repeatedly :D\n", gbtn_names[btn]);
             if (btn >= GBTN_MAX)
             {
                 for (int sbtn=special_button_min(btn); sbtn < special_button_max(btn); sbtn++)
                 {
-                    GPTK2_DEBUG("%s: repeatedly :D\n", gbtn_names[sbtn]);
                     config->button[sbtn].repeat = true;
                 }
             }
@@ -665,29 +668,29 @@ static int config_ini_handler(
 
     if (strcmp(config->last_section, section) != 0)
     {
-        GPTK2_DEBUG("%s:\n", section);
+        // GPTK2_DEBUG("%s:\n", section);
         strncpy(config->last_section, section, MAX_CONTROL_NAME-1);
 
         if (strcasecmp(section, "config") == 0)
         {
-            GPTK2_DEBUG("CONFIG\n");
+            // GPTK2_DEBUG("CONFIG\n");
             config->state = CFG_CONFIG;
         }
         else if (strcasecmp(section, "controls") == 0)
         {
-            GPTK2_DEBUG("CONTROLS\n");
+            // GPTK2_DEBUG("CONTROLS\n");
             config->state = CFG_CONTROL;
             config->current_config = root_config;
         }
         else if (strcasestartswith(section, "controls:"))
         {
-            GPTK2_DEBUG("CONTROLS++\n");
+            // GPTK2_DEBUG("CONTROLS++\n");
             config->state = CFG_CONTROL;
             config->current_config = config_create(section);
         }
         else
         {
-            GPTK2_DEBUG("OTHER\n");
+            // GPTK2_DEBUG("OTHER\n");
             config->state = CFG_OTHER;
         }
     }
@@ -699,41 +702,41 @@ static int config_ini_handler(
         if (button != NULL)
         {
             set_btn_config(config->current_config, button->gbtn, name, value);
-            GPTK2_DEBUG("G: %s: %s, (%s, %d)\n", name, value, button->str, button->gbtn);
+            // GPTK2_DEBUG("G: %s: %s, (%s, %d)\n", name, value, button->str, button->gbtn);
         }
         else if (strcasecmp(name, "overlay") == 0)
         {
             if (strcasecmp(value, "parent") == 0)
             {
-                GPTK2_DEBUG("overlay = parent\n");
+                // GPTK2_DEBUG("overlay = parent\n");
                 config_overlay_parent(config->current_config);
             }
             else if (strcasecmp(value, "clear") == 0)
             {
-                GPTK2_DEBUG("overlay = clear\n");
+                // GPTK2_DEBUG("overlay = clear\n");
                 config_overlay_clear(config->current_config);
             }
             else if (strlen(value) > 0)
             {
-                GPTK2_DEBUG("overlay = %s\n", value);
+                // GPTK2_DEBUG("overlay = %s\n", value);
                 config_overlay_named(config->current_config, value);
             }
             else
             {
-                fprintf(stderr, "overlay = (blank)\n");
+                // fprintf(stderr, "overlay = (blank)\n");
             }
         }
         else
         {
             set_cfg_config(name, value);
-            GPTK2_DEBUG("G: %s: %s\n", name, value);
+            // GPTK2_DEBUG("G: %s: %s\n", name, value);
         }
     }
 
     else if (config->state == CFG_CONFIG)
     {   // config mode.
         set_cfg_config(name, value);
-        GPTK2_DEBUG("C: %s: %s\n", name, value);
+        // GPTK2_DEBUG("C: %s: %s\n", name, value);
     }
 
     else if (config->state == CFG_CONTROL)
@@ -743,28 +746,28 @@ static int config_ini_handler(
         if (button != NULL)
         {
             set_btn_config(config->current_config, button->gbtn, name, value);
-            GPTK2_DEBUG("X: %s: %s (%s, %d)\n", name, value, button->str, button->gbtn);
+            // GPTK2_DEBUG("X: %s: %s (%s, %d)\n", name, value, button->str, button->gbtn);
         }
         else if (strcasecmp(name, "overlay") == 0)
         {
             if (strcasecmp(value, "parent") == 0)
             {
-                GPTK2_DEBUG("overlay = parent\n");
+                // GPTK2_DEBUG("overlay = parent\n");
                 config_overlay_parent(config->current_config);
             }
             else if (strcasecmp(value, "clear") == 0)
             {
-                GPTK2_DEBUG("overlay = clear\n");
-                config_overlay_parent(config->current_config);
+                // GPTK2_DEBUG("overlay = clear\n");
+                config_overlay_clear(config->current_config);
             }
             else if (strlen(value) > 0)
             {
-                GPTK2_DEBUG("overlay = %s\n", value);
+                // GPTK2_DEBUG("overlay = %s\n", value);
                 config_overlay_named(config->current_config, value);
             }
             else
             {
-                fprintf(stderr, "overlay = (blank)\n");
+                // fprintf(stderr, "overlay = (blank)\n");
             }
         }
         else
@@ -811,7 +814,7 @@ void config_finalise()
 
     while (current != NULL)
     {
-        GPTK2_DEBUG("Checking %s\n", current->name);
+        // GPTK2_DEBUG("Checking %s\n", current->name);
         int seen_mouse_slow = -1;
 
         if (current->map_check)

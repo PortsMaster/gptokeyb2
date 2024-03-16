@@ -265,6 +265,17 @@ const button_match button_codes[] = {
     {"right_analog", GBTN_RIGHT_ANALOG},
 };
 
+button_match button_hotkey = {"hotkey", GBTN_BACK};
+
+void set_hotkey(int gbtn)
+{
+    if (gbtn < 0 || gbtn > GBTN_MAX)
+        return;
+
+    current_state.hotkey_gbtn = gbtn;
+    button_hotkey.gbtn = gbtn;
+}
+
 const button_match *find_button(const char *key)
 {
     int num_pairs = sizeof(button_codes) / sizeof(button_codes[0]);
@@ -273,6 +284,11 @@ const button_match *find_button(const char *key)
     {
         if (strcasecmp(key, button_codes[i].str) == 0)
             return &button_codes[i];
+    }
+
+    if (strcasecmp(key, button_hotkey.str) == 0)
+    {
+        return &button_hotkey;
     }
 
     return NULL;

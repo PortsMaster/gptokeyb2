@@ -37,12 +37,20 @@
 
 #include "gptokeyb2.h"
 
-
+#define MAX_PROCESS_NAME 64
 #define DEFAULT_CONFIG "~/.config/gptokeyb2.ini"
 
 int uinp_fd=0;
 bool xbox360_mode=false;
 bool config_mode=false;
+
+bool want_pc_quit = false;
+bool want_kill = false;
+bool want_sudo = false;
+
+char kill_process_name[64] = "";
+
+
 gptokeyb_config *default_config=NULL;
 
 struct uinput_user_dev uidev;
@@ -50,16 +58,92 @@ struct uinput_user_dev uidev;
 
 int main(int argc, char* argv[])
 {
+    bool do_dump_config = false;
+
+    state_init();
     config_init();
 
-    bool done = false;
-    char opt;
+    // Add hotkey environment variable if available
+    char* env_hotkey = SDL_getenv("HOTKEY");
+    if (env_hotkey)
+    {
+        const button_match *button = find_button(env_hotkey);
+
+        if (button != NULL)
+        {
+            printf("set hotkey as %s\n", env_hotkey);
+            set_hotkey(button->gbtn);
+        }
+    }
+
+    // Add pc alt+f4 exit environment variable if available
+    char* env_pckill_mode = SDL_getenv("PCKILLMODE");
+    if (env_pckill_mode)
+    {
+        if (strcmp(env_pckill_mode, "Y") == 0)
+        {
+            printf("Using pc quit mode.\n");
+            want_pc_quit = true;
+        }
+    }
+
+    char* pkill_mode = SDL_getenv("NO_PKILL");
+    if (pkill_mode)
+    {
+        want_kill = true;
+    }
+
+    int opt;
     char default_control[MAX_CONTROL_NAME] = "";
 
-    while ((!done) && ((opt = getopt(argc, argv, "xp:c:")) != -1))
+    while ((opt = getopt(argc, argv, "hdxp:c:XPH:")) != -1)
     {
         switch (opt)
         {
+        case 'X':
+            if (!want_kill)
+            {            
+                printf("Using kill mode.\n");
+                want_kill = true;
+            }
+            break;
+
+        case 'Z':
+            if (want_kill)
+            {            
+                printf("Using pkill mode.\n");
+                want_kill = false;
+            }
+            break;
+
+        case 'P':
+            if (!want_pc_quit)
+            {            
+                printf("Using pc quit mode.\n");
+                want_pc_quit = true;
+            }
+            break;
+
+        case 'H':
+            {
+                const button_match *button = find_button(optarg);
+
+                if (button != NULL)
+                {
+                    printf("set hotkey as %s\n", optarg);
+                    set_hotkey(button->gbtn);
+                }
+                else
+                {
+                    printf("unable to set hotkey as %s, unknown hotkey\n", optarg);
+                }
+            }
+            break;
+
+        case 'd':
+            do_dump_config = true;
+            break;
+
         case 'c':
             config_load(optarg, false);
             config_mode = true;
@@ -83,15 +167,42 @@ int main(int argc, char* argv[])
                 fprintf (stderr, "Unknown option `-%c'.\n", optopt);
             else
                 fprintf (stderr, "Unknown option character `\\x%x'.\n", optopt);
-            return 1;
+
+            fprintf(stderr, "\n");
+
+        case 'h':
+            fprintf(stderr, "Usage: %s <program> [-dPXZ] [-H hotkey] [-c <config.ini>] [-p control_mode]\n",
+                argv[0]);
+            fprintf(stderr, "\n");
+            fprintf(stderr, "Args:\n");
+            fprintf(stderr, "  -P                  - pc quit mode (sends alt + f4 to quit program)\n");
+            fprintf(stderr, "  -X                  - uses kill to quit the program\n");
+            fprintf(stderr, "  -Z                  - uses pkill to quit the program\n");
+            fprintf(stderr, "\n");
+            fprintf(stderr, "  -x                  - xbox360 mode.\n");
+            fprintf(stderr, "  -c  \"config.ini\"    - config file to load.\n");
+            fprintf(stderr, "  -p  \"control\"       - what control mode to start in.\n");
+            fprintf(stderr, "\n");
+            fprintf(stderr, "  -d                  - dump config parsed.\n");
+            fprintf(stderr, "\n");
+            break;
 
         default:
-            printf("%d\n", opt);
-            done = true;
+            config_quit();
+            exit(EXIT_FAILURE);
             break;
-            // fprintf(stderr, "Usage: %s [-c <config.ini>] [-p control_mode]\n", argv[0]);
-            // config_quit();
-            // exit(EXIT_FAILURE);
+        }
+    }
+
+    for (int index=optind, i=0; index < argc; index++, i++)
+    {
+        if (i == 0)
+        {
+            strncpy(kill_process_name, argv[index], MAX_PROCESS_NAME);
+        }
+        else
+        {
+            printf("Extra option: %s\n", argv[index]);
         }
     }
 
@@ -117,10 +228,14 @@ int main(int argc, char* argv[])
         {
             default_config = root_config;
         }
+
+        config_stack[0] = default_config;
     }
 
     config_finalise();
-    config_dump();
+
+    if (do_dump_config)
+        config_dump();
 
     // SDL initialization and main loop
     if (SDL_Init(SDL_INIT_GAMECONTROLLER | SDL_INIT_TIMER) != 0)
@@ -173,19 +288,19 @@ int main(int argc, char* argv[])
     }
 
     SDL_Event event;
-    bool running = false;
-    int mouse_x = 0;
-    int mouse_y = 0;
 
-    while (running)
+    while (current_state.running)
     {
-        if (!SDL_WaitEvent(&event))
+        // POLL events
+        while (current_state.running && SDL_PollEvent(&event))
         {
-            fprintf(stderr, "SDL_WaitEvent() failed: %s\n", SDL_GetError());
-            break;
+            handleInputEvent(&event);
         }
 
-        running = handleInputEvent(&event);
+        state_update();
+
+        // sleep.
+        SDL_Delay(16);
     }
 
     SDL_Quit();

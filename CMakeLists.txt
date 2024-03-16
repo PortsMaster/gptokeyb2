@@ -29,10 +29,8 @@ include_directories(
   ${SDL2_INCLUDE_DIRS}
   )
 
-
-set(EXTRA_CFLAGS "${EXTRA_CFLAGS} -Wall -g3 -O0")
-
 add_executable(gptokeyb2
+    src/analog.c
     src/config.c
     src/ini.c
     src/keys.c
@@ -47,4 +45,5 @@ add_executable(gptokeyb2
 target_link_libraries(gptokeyb2
     ${SDL2_LIBRARIES}
     ${LIBEVDEV_LIBRARIES}
+    m
     )

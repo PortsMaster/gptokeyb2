@@ -132,23 +132,55 @@ void handleEventBtnFakeKeyboardMouseDevice(const SDL_Event *event, bool pressed)
 
 void handleEventAxisFakeKeyboardMouseDevice(const SDL_Event *event)
 {
+    bool left_axis_movement = false;
+    bool right_axis_movement = false;
+
     switch (event->caxis.axis) {
     case SDL_CONTROLLER_AXIS_LEFTX:
+        current_state.current_left_analog_x = event->caxis.value;
+        left_axis_movement = true;
         break;
 
     case SDL_CONTROLLER_AXIS_LEFTY:
+        current_state.current_left_analog_y = event->caxis.value;
+        left_axis_movement = true;
         break;
 
     case SDL_CONTROLLER_AXIS_RIGHTX:
+        current_state.current_right_analog_x = event->caxis.value;
+        right_axis_movement = true;
         break;
 
     case SDL_CONTROLLER_AXIS_RIGHTY:
+        current_state.current_right_analog_y = event->caxis.value;
+        right_axis_movement = true;
         break;
 
     case SDL_CONTROLLER_AXIS_TRIGGERLEFT:
+        current_state.current_l2 = event->caxis.value;
         break;
 
     case SDL_CONTROLLER_AXIS_TRIGGERRIGHT:
+        current_state.current_r2 = event->caxis.value;
         break;
-    } // switch (event.caxis.axis)
+    } // switch (event->caxis.axis)
+
+    // fake mouse
+    if (current_left_analog_as_mouse && left_axis_movement)
+    {
+        deadzone_mouse_calc(
+            &current_state.mouse_x, &current_state.mouse_y,
+            current_state.current_left_analog_x, current_state.current_left_analog_y);
+    }
+    else if (current_right_analog_as_mouse && right_axis_movement)
+    {
+        deadzone_mouse_calc(
+            &current_state.mouse_x, &current_state.mouse_y,
+            current_state.current_right_analog_x, current_state.current_right_analog_x);
+    }
+    else
+    {
+        update_button(GBTN_L2, current_state.current_l2 > current_state.deadzone_triggers);
+        update_button(GBTN_R2, current_state.current_r2 > current_state.deadzone_triggers);
+    } // Analogs trigger keys 
 }

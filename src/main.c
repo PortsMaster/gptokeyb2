@@ -48,7 +48,7 @@ bool want_pc_quit = false;
 bool want_kill = false;
 bool want_sudo = false;
 
-char kill_process_name[64] = "";
+char kill_process_name[MAX_PROCESS_NAME] = "";
 
 
 gptokeyb_config *default_config=NULL;
@@ -288,19 +288,60 @@ int main(int argc, char* argv[])
     }
 
     SDL_Event event;
+    int mouse_x=0;
+    int mouse_y=0;
 
     while (current_state.running)
     {
-        // POLL events
-        while (current_state.running && SDL_PollEvent(&event))
+        if (current_state.mouse_x != 0 || current_state.mouse_x != 0 || current_state.mouse_move > 0)
         {
-            handleInputEvent(&event);
+            while (current_state.running && SDL_PollEvent(&event))
+            {
+                handleInputEvent(&event);
+            }
+
+            state_update();
+
+            mouse_x = current_state.mouse_x;
+            mouse_y = current_state.mouse_y;
+
+            if (current_state.mouse_move > 0)
+            {
+                vector2d mouse_move;
+
+                mouse_move.x -= (is_pressed(GBTN_DPAD_LEFT ) ? 1.0f : 0.0f);
+                mouse_move.x += (is_pressed(GBTN_DPAD_RIGHT) ? 1.0f : 0.0f);
+                mouse_move.y -= (is_pressed(GBTN_DPAD_UP   ) ? 1.0f : 0.0f);
+                mouse_move.y += (is_pressed(GBTN_DPAD_DOWN ) ? 1.0f : 0.0f);
+
+                vector2d_normalize(&mouse_move);
+
+                mouse_x += (int)(mouse_move.x * current_state.dpad_mouse_step);
+                mouse_y += (int)(mouse_move.y * current_state.dpad_mouse_step);
+            }
+
+            if (current_state.mouse_slow)
+            {
+                mouse_x = (int)((float)(mouse_x) / 2);
+                mouse_y = (int)((float)(mouse_y) / 2);
+            }
+
+            emitMouseMotion(mouse_x, mouse_y);
+
+            // sleep.
+            SDL_Delay(16);
         }
+        else
+        {
+            while (current_state.running && SDL_PollEvent(&event))
+            {
+                handleInputEvent(&event);
+            }
 
-        state_update();
+            state_update();
 
-        // sleep.
-        SDL_Delay(16);
+            SDL_Delay(16);
+        }
     }
 
     SDL_Quit();

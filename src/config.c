@@ -111,7 +111,6 @@ const char *act_names[] = {
     "(none)",
     "parent",
     "mouse_slow",
-    "mouse_move",
     "pop_state",
     "hold_state",
     "push_state",
@@ -203,6 +202,16 @@ void config_dump()
         printf("[%s]\n", current->name);
         for (int btn=0; btn < GBTN_MAX; btn++)
         {
+            if ((current->dpad_as_mouse && btn == GBTN_DPAD_UP) ||
+                (current->left_analog_as_mouse && btn == GBTN_LEFT_ANALOG_UP) ||
+                (current->right_analog_as_mouse && btn == GBTN_RIGHT_ANALOG_UP))
+            {
+                printf("%s = mouse_movement\n", gbtn_names[btn]);
+                printf("\n");
+                btn += 3;
+                continue;
+            }
+
             printf("%s =", gbtn_names[btn]);
 
             if (current->button[btn].keycode != 0)
@@ -620,10 +629,19 @@ void set_btn_config(gptokeyb_config *config, int btn, const char *name, const ch
             {
                 if (btn >= GBTN_MAX)
                 {
+                    if (btn == GBTN_DPAD)
+                        config->dpad_as_mouse = true;
+
+                    else if (btn == GBTN_LEFT_ANALOG)
+                        config->left_analog_as_mouse = true;
+
+                    else if (btn == GBTN_RIGHT_ANALOG)
+                        config->right_analog_as_mouse = true;
+
                     for (int sbtn=special_button_min(btn), i=0; sbtn < special_button_max(btn); sbtn++, i++)
                     {
                         config->button[sbtn].keycode = 0;
-                        config->button[sbtn].action = ACT_MOUSE_MOVE;
+                        config->button[sbtn].action = ACT_NONE;
                     }
                 }
                 else
@@ -636,6 +654,15 @@ void set_btn_config(gptokeyb_config *config, int btn, const char *name, const ch
             {
                 if (btn >= GBTN_MAX)
                 {
+                    if (btn == GBTN_DPAD)
+                        config->dpad_as_mouse = false;
+
+                    else if (btn == GBTN_LEFT_ANALOG)
+                        config->left_analog_as_mouse = false;
+
+                    else if (btn == GBTN_RIGHT_ANALOG)
+                        config->right_analog_as_mouse = false;
+
                     short keycodes[] = {KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT};
                     for (int sbtn=special_button_min(btn), i=0; sbtn < special_button_max(btn); sbtn++, i++)
                     {
@@ -700,7 +727,13 @@ static int config_ini_handler(
         const button_match *button = find_button(name);
 
         if (button != NULL)
-        {
+        {   // fixes things from old gptk files.
+            if ((GBTN_IS_DPAD(button->gbtn)) ||
+                (GBTN_IS_LEFT_ANALOG(button->gbtn)) ||
+                (GBTN_IS_RIGHT_ANALOG(button->gbtn)) &&
+                    (strcasestartswith(value, "mouse_movement_") == 0))
+                value = "mouse_movement";
+
             set_btn_config(config->current_config, button->gbtn, name, value);
             // GPTK2_DEBUG("G: %s: %s, (%s, %d)\n", name, value, button->str, button->gbtn);
         }
@@ -815,23 +848,21 @@ void config_finalise()
     while (current != NULL)
     {
         // GPTK2_DEBUG("Checking %s\n", current->name);
-        int seen_mouse_slow = -1;
+
+        // figured out a better way of handling mouse_slow.
+        // int seen_mouse_slow = -1;
 
         if (current->map_check)
         {
             for (int btn=0; btn < GBTN_MAX; btn++)
             {
-                if (current->button[btn].action == ACT_MOUSE_SLOW)
+                // FUCK IT ALL
+                if ((current->dpad_as_mouse && GBTN_IS_DPAD(btn)) || 
+                    (current->left_analog_as_mouse  && GBTN_IS_LEFT_ANALOG(btn)) || 
+                    (current->right_analog_as_mouse && GBTN_IS_RIGHT_ANALOG(btn)))
                 {
-                    if (seen_mouse_slow >= 0)
-                    {
-                        fprintf(stderr, "%s: '%s = mouse_slow', is set on multiple buttons, previous button was '%s', this can cause issues.\n",
-                            current->name,
-                            gbtn_names[btn],
-                            gbtn_names[seen_mouse_slow]);
-                    }
-
-                    seen_mouse_slow = btn;
+                    current->button[btn].keycode = 0;
+                    current->button[btn].action = ACT_NONE;
                 }
 
                 if (current->button[btn].action >= ACT_STATE_HOLD)

@@ -69,7 +69,7 @@
 #endif
 
 #ifndef SDL_DEFAULT_REPEAT_INTERVAL
-#define SDL_DEFAULT_REPEAT_INTERVAL 30
+#define SDL_DEFAULT_REPEAT_INTERVAL 60
 #endif
 
 
@@ -86,6 +86,20 @@
 #define MOD_SHIFT 0x01
 #define MOD_CTRL  0x02
 #define MOD_ALT   0x04
+
+
+// Deadzone modes
+enum
+{
+    DZ_DEFAULT,
+    DZ_AXIAL,
+    DZ_RADIAL,
+    DZ_SCALED_RADIAL,
+    DZ_SLOPED_AXIAL,
+    DZ_SLOPED_SCALED_AXIAL,
+    DZ_HYBRID,
+};
+
 
 // BUTTON DEFS
 enum
@@ -130,21 +144,29 @@ enum
     GBTN_RIGHT_ANALOG,
 };
 
+#define GBTN_IS_DPAD(gbtn) \
+    ((gbtn == GBTN_DPAD_UP)   || \
+     (gbtn == GBTN_DPAD_DOWN) || \
+     (gbtn == GBTN_DPAD_LEFT) || \
+     (gbtn == GBTN_DPAD_RIGHT))
 
-// BUTTON_STATE.state
-enum
-{
-    BTN_UP,
-    BTN_DOWN,
-    BTN_HOLD, // special
-};
+#define GBTN_IS_LEFT_ANALOG(gbtn) \
+    ((gbtn == GBTN_LEFT_ANALOG_UP)   || \
+     (gbtn == GBTN_LEFT_ANALOG_DOWN) || \
+     (gbtn == GBTN_LEFT_ANALOG_LEFT) || \
+     (gbtn == GBTN_LEFT_ANALOG_RIGHT))
+
+#define GBTN_IS_RIGHT_ANALOG(gbtn) \
+    ((gbtn == GBTN_RIGHT_ANALOG_UP)   || \
+     (gbtn == GBTN_RIGHT_ANALOG_DOWN) || \
+     (gbtn == GBTN_RIGHT_ANALOG_LEFT) || \
+     (gbtn == GBTN_RIGHT_ANALOG_RIGHT))
 
 enum
 {
     ACT_NONE,
     ACT_PARENT,
     ACT_MOUSE_SLOW,
-    ACT_MOUSE_MOVE,
     ACT_STATE_POP,
     // Make sure these are last, that way we can check for
     // (action >= ACT_STATE_HOLD) to see if it needs a cfg_name
@@ -158,6 +180,10 @@ enum
     OPT_INT,
     OPT_STR,
 };
+
+#define MOUSE_MOVEMENT_PARENT = -1
+#define MOUSE_MOVEMENT_OFF = 0
+#define MOUSE_MOVEMENT_ON = 1
 
 typedef struct _gptokeyb_config gptokeyb_config;
 
@@ -178,6 +204,11 @@ struct _gptokeyb_config
     gptokeyb_config *next;
     char name[MAX_CONTROL_NAME];
 
+    // one of MOUSE_MOVEMENT_PARENT / OFF / ON
+    int left_analog_as_mouse;
+    int right_analog_as_mouse;
+    int dpad_as_mouse;
+
     bool map_check;
     BUTTON_MAP button[GBTN_MAX];
 };
@@ -191,7 +222,30 @@ typedef struct
 
     bool pop_held[GBTN_MAX];
 
-    bool mouse_slow;
+    int current_left_analog_x;
+    int current_left_analog_y;
+
+    int current_right_analog_x;
+    int current_right_analog_y;
+
+    int current_l2;
+    int current_r2;
+
+    int mouse_x;
+    int mouse_y;
+
+    Uint32 mouse_slow;
+    Uint32 mouse_move;
+
+    int dpad_mouse_step;
+
+    int deadzone_mode;
+    int deadzone_scale;
+
+    int deadzone;
+    int deadzone_y;
+    int deadzone_x;
+    int deadzone_triggers;
 
     bool in_repeat[GBTN_MAX];
     Uint32 held_since[GBTN_MAX];
@@ -226,7 +280,14 @@ typedef struct {
     short modifier;
 } keyboard_values;
 
+// Basic vector 2d class for better analog deadzone code
+typedef struct
+{
+    float x;
+    float y;
+} vector2d;
 
+// some stuff
 extern const keyboard_values keyboard_codes[];
 extern const button_match button_codes[];
 
@@ -238,6 +299,10 @@ extern gptokeyb_config *config_stack[];
 extern gptokeyb_config *default_config;
 extern gptokeyb_state current_state;
 extern int gptokeyb_config_depth;
+// these get filled out as the state changes
+extern bool current_dpad_as_mouse;
+extern bool current_left_analog_as_mouse;
+extern bool current_right_analog_as_mouse;
 
 // stuff
 extern int uinp_fd;
@@ -259,6 +324,18 @@ gptokeyb_config *config_find(const char *name);
 gptokeyb_config *config_create(const char *name);
 void config_free(gptokeyb_config *config);
 int config_load(const char *file_name, bool config_only);
+
+// analog.c
+void vector2d_clear(vector2d *vec2d);
+void vector2d_set_vector2d(vector2d *vec2d, const vector2d *other);
+void vector2d_set_float(vector2d *vec2d, float v);
+void vector2d_set_float2(vector2d *vec2d, float x, float y);
+void vector2d_normalize(vector2d *vec2d);
+float vector2d_magnitude(const vector2d *vec2d);
+
+int deadzone_get_mode(const char *str);
+void deadzone_trigger_calc(int *analog, int analog_in);
+void deadzone_mouse_calc(int *x, int *y, int in_x, int in_y);
 
 // keys.c
 const keyboard_values *find_keyboard(const char *key);
@@ -295,6 +372,7 @@ void update_button(int btn, bool pressed);
 
 void state_init();
 void state_update();
+gptokeyb_config *state_active();
 
 void push_state(gptokeyb_config *);
 void set_state(gptokeyb_config *);

@@ -181,9 +181,9 @@ enum
     OPT_STR,
 };
 
-#define MOUSE_MOVEMENT_PARENT = -1
-#define MOUSE_MOVEMENT_OFF = 0
-#define MOUSE_MOVEMENT_ON = 1
+#define MOUSE_MOVEMENT_PARENT -1
+#define MOUSE_MOVEMENT_OFF 0
+#define MOUSE_MOVEMENT_ON 1
 
 typedef struct _gptokeyb_config gptokeyb_config;
 
@@ -238,13 +238,14 @@ typedef struct
     Uint32 mouse_move;
 
     int dpad_mouse_step;
+    int mouse_slow_scale;
+    bool dpad_mouse_normalize;
 
     int deadzone_mode;
     int deadzone_scale;
 
-    int deadzone;
-    int deadzone_y;
     int deadzone_x;
+    int deadzone_y;
     int deadzone_triggers;
 
     bool in_repeat[GBTN_MAX];
@@ -262,8 +263,10 @@ typedef struct
 // Define a struct to hold string and integer pairs
 typedef struct {
     const char *str;
-    int num;
-} key_values;
+    int type;
+    const char *default_str;
+    int default_value;
+} option_values;
 
 
 // Define a struct to hold string and integer pairs
@@ -293,10 +296,15 @@ extern const button_match button_codes[];
 
 extern const char *gbtn_names[];
 extern const char *act_names[];
+extern char default_control_name[];
 
 extern gptokeyb_config *root_config;
 extern gptokeyb_config *config_stack[];
 extern gptokeyb_config *default_config;
+extern gptokeyb_config *config_temp_stack[];
+extern int config_temp_stack_order[];
+extern int config_temp_stack_order_id;
+
 extern gptokeyb_state current_state;
 extern int gptokeyb_config_depth;
 // these get filled out as the state changes
@@ -314,12 +322,15 @@ extern bool want_kill;
 extern bool want_sudo;
 extern char kill_process_name[];
 
+extern char game_prefix[];
+
 // config.c
 void config_init();
 void config_quit();
 void config_dump();
 void config_finalise();
 
+void config_overlay_clear(gptokeyb_config *current);
 gptokeyb_config *config_find(const char *name);
 gptokeyb_config *config_create(const char *name);
 void config_free(gptokeyb_config *config);
@@ -334,6 +345,7 @@ void vector2d_normalize(vector2d *vec2d);
 float vector2d_magnitude(const vector2d *vec2d);
 
 int deadzone_get_mode(const char *str);
+const char *deadzone_mode_str(int mode);
 void deadzone_trigger_calc(int *analog, int analog_in);
 void deadzone_mouse_calc(int *x, int *y, int in_x, int in_y);
 
@@ -377,6 +389,7 @@ gptokeyb_config *state_active();
 void push_state(gptokeyb_config *);
 void set_state(gptokeyb_config *);
 void pop_state();
+void state_change_update();
 
 // event.c
 void handleInputEvent(const SDL_Event *event);

@@ -38,6 +38,9 @@
 #include "gptokeyb2.h"
 
 gptokeyb_state current_state;
+bool current_dpad_as_mouse = false;
+bool current_left_analog_as_mouse = false;
+bool current_right_analog_as_mouse = false;
 
 
 void state_init()
@@ -52,15 +55,49 @@ void state_init()
     current_state.repeat_rate = SDL_DEFAULT_REPEAT_INTERVAL;
 
     current_state.dpad_mouse_step = 5;
+    current_state.mouse_slow_scale = 50;
 
     current_state.deadzone_mode = DZ_DEFAULT;
     current_state.deadzone_scale = 512;
 
-    current_state.deadzone   = 15000;
-    current_state.deadzone_y = 15000;
-    current_state.deadzone_x = 15000;
+    current_state.deadzone_x = 1000;
+    current_state.deadzone_y = 1000;
     current_state.deadzone_triggers = 3000;
+
+    current_state.dpad_mouse_normalize = true;
 }
+
+
+void push_temp_state(gptokeyb_config *new_config, int btn)
+{
+    config_temp_stack[btn] = new_config;
+    config_temp_stack_order[btn] = ++config_temp_stack_order_id;
+
+    state_change_update();
+}
+
+
+void pop_temp_state(int btn)
+{
+    bool all_done = true;
+    config_temp_stack[btn] = NULL;
+    config_temp_stack_order[btn] = 0;
+
+    for (int sbtn=0; sbtn < GBTN_MAX; sbtn++)
+    {
+        if (config_temp_stack[sbtn] != NULL)
+        {
+            all_done = false;
+            break;
+        }
+    }
+
+    if (all_done)
+        config_temp_stack_order_id = 0;
+
+    state_change_update();
+}
+
 
 void push_state(gptokeyb_config *new_config)
 {
@@ -74,20 +111,31 @@ void push_state(gptokeyb_config *new_config)
         return;
     }
 
+#ifdef GPTK2_DEBUG_ENABLED
     for (int i = 0; i < gptokeyb_config_depth; i++) {
-        GPTK2_DEBUG("  ");
+        printf("  ");
     }
-    GPTK2_DEBUG("push_state: %s\n", new_config->name);
+
+    printf("push_state: %s\n", new_config->name);
+#endif
+
     config_stack[++gptokeyb_config_depth] = new_config;
+
+    state_change_update();
 }
 
 void set_state(gptokeyb_config *new_config)
 {
+#ifdef GPTK2_DEBUG_ENABLED
     for (int i = 0; i < gptokeyb_config_depth; i++) {
-        GPTK2_DEBUG("  ");
+        printf("  ");
     }
-    GPTK2_DEBUG("set_state: %s\n", new_config->name);
+    printf("set_state: %s\n", new_config->name);
+#endif
+
     config_stack[gptokeyb_config_depth] = new_config;
+
+    state_change_update();
 }
 
 void pop_state()
@@ -95,11 +143,16 @@ void pop_state()
     if (gptokeyb_config_depth == 0)
         return;
 
+#ifdef GPTK2_DEBUG_ENABLED
     for (int i = 0; i < gptokeyb_config_depth; i++) {
-        GPTK2_DEBUG("  ");
+        printf("  ");
     }
-    GPTK2_DEBUG("pop_state: %s\n", config_stack[gptokeyb_config_depth]->name);
+    printf("pop_state: %s\n", config_stack[gptokeyb_config_depth]->name);
+#endif
+
     gptokeyb_config_depth--;
+
+    state_change_update();
 }
 
 
@@ -134,6 +187,7 @@ Uint32 held_for(int btn)
 
     return (SDL_GetTicks() - current_state.held_since[btn]);
 }
+
 
 void state_update()
 {   /* This updates the internal state machine.
@@ -182,14 +236,123 @@ void state_update()
     }
 }
 
-gptokeyb_config *state_active()
-{
-    return config_stack[current_depth];
+
+void state_change_update()
+{   // check as mouse_move
+    #define NOT_FOUND_DPADS (!found_dpad_as_mouse || !found_left_analog_as_mouse || !found_right_analog_as_mouse)
+
+    bool found_dpad_as_mouse = false;
+    bool found_left_analog_as_mouse = false;
+    bool found_right_analog_as_mouse = false;
+
+    int left_analog_as_mouse;
+    int right_analog_as_mouse;
+    int dpad_as_mouse;
+
+    // check temp stacks
+    int order_id = config_temp_stack_order_id;
+    while (order_id > 0 && NOT_FOUND_DPADS)
+    {
+        for (int sbtn=0; sbtn < GBTN_MAX; sbtn++)
+        {
+            if (config_temp_stack[sbtn] == NULL)
+                continue;
+
+            if (config_temp_stack_order[sbtn] != order_id)
+                continue;
+
+            gptokeyb_config *current = config_temp_stack[sbtn];
+
+            if (!found_dpad_as_mouse && current->dpad_as_mouse != MOUSE_MOVEMENT_PARENT)
+            {
+                current_dpad_as_mouse = (current->dpad_as_mouse == MOUSE_MOVEMENT_ON);
+                found_dpad_as_mouse = true;
+            }
+
+            if (!found_left_analog_as_mouse && current->left_analog_as_mouse != MOUSE_MOVEMENT_PARENT)
+            {
+                current_left_analog_as_mouse = (current->left_analog_as_mouse == MOUSE_MOVEMENT_ON);
+                found_left_analog_as_mouse = true;
+            }
+
+            if (!found_right_analog_as_mouse && current->right_analog_as_mouse != MOUSE_MOVEMENT_PARENT)
+            {
+                current_right_analog_as_mouse = (current->right_analog_as_mouse == MOUSE_MOVEMENT_ON);
+                found_right_analog_as_mouse = true;
+            }
+        }
+
+        order_id--;
+    }
+
+    int current_depth = gptokeyb_config_depth;
+
+    while (current_depth >= 0 && NOT_FOUND_DPADS)
+    {
+        gptokeyb_config *current = config_stack[current_depth];
+
+        if (!found_dpad_as_mouse && current->dpad_as_mouse != MOUSE_MOVEMENT_PARENT)
+        {
+            current_dpad_as_mouse = (current->dpad_as_mouse == MOUSE_MOVEMENT_ON);
+            found_dpad_as_mouse = true;
+        }
+
+        if (!found_left_analog_as_mouse && current->left_analog_as_mouse != MOUSE_MOVEMENT_PARENT)
+        {
+            current_left_analog_as_mouse = (current->left_analog_as_mouse == MOUSE_MOVEMENT_ON);
+            found_left_analog_as_mouse = true;
+        }
+
+        if (!found_right_analog_as_mouse && current->right_analog_as_mouse != MOUSE_MOVEMENT_PARENT)
+        {
+            current_right_analog_as_mouse = (current->right_analog_as_mouse == MOUSE_MOVEMENT_ON);
+            found_right_analog_as_mouse = true;
+        }
+
+        current_depth--;
+    }
+
+    if (!found_dpad_as_mouse)
+        current_dpad_as_mouse = false;
+
+    if (!found_left_analog_as_mouse)
+        current_left_analog_as_mouse = false;
+
+    if (!found_right_analog_as_mouse)
+        current_right_analog_as_mouse = false;
 }
+
 
 const BUTTON_MAP *state_button(int btn)
 {   // resolve a button through parent states.
     BUTTON_MAP *button;
+
+    // check temp states
+    int order_id = config_temp_stack_order_id;
+    while (order_id > 0)
+    {
+        for (int sbtn=0; sbtn < GBTN_MAX; sbtn++)
+        {
+            if (config_temp_stack[sbtn] == NULL)
+                continue;
+
+            if (config_temp_stack_order[sbtn] != order_id)
+                continue;
+
+            gptokeyb_config *current = config_temp_stack[sbtn];
+
+            if (current->button[btn].action == ACT_PARENT)
+                continue;
+
+            GPTK2_DEBUG("found temp[%s] -> %s\n", gbtn_names[sbtn], gbtn_names[btn]);
+
+            return &current->button[btn];
+        }
+
+        order_id--;
+    }
+
+    // check stack
     int current_depth = gptokeyb_config_depth;
 
     while (current_depth >= 0)
@@ -199,7 +362,10 @@ const BUTTON_MAP *state_button(int btn)
         button = &config->button[btn];
 
         if (button->action != ACT_PARENT)
+        {
+            GPTK2_DEBUG("found stack[%d] -> %s\n", current_depth, gbtn_names[btn]);
             return button;
+        }
 
         current_depth--;
     }
@@ -211,18 +377,19 @@ const BUTTON_MAP *state_button(int btn)
 void update_button(int btn, bool pressed)
 {
     Uint32 current_ticks = SDL_GetTicks();
-
-    gptokeyb_config *config = config_stack[gptokeyb_config_depth];
-
-    const BUTTON_MAP *button = state_button(btn);
-
-    if (button == NULL)
-        return;
+    const BUTTON_MAP *button;
 
     current_state.pressed[btn] = pressed;
 
     if (was_pressed(btn))
     {
+        button = state_button(btn);
+
+        if (button == NULL)
+            return;
+
+        GPTK2_DEBUG("%s -> %s\n", gbtn_names[btn], (pressed ? "pressed" : "released"));
+
         if (!current_state.in_repeat[btn])
         {
             current_state.held_since[btn] = current_ticks;
@@ -235,12 +402,18 @@ void update_button(int btn, bool pressed)
         else if (button->action >= ACT_STATE_HOLD)
         {   // change control state
             if (button->action == ACT_STATE_HOLD)
+            {
+                push_temp_state(button->cfg_map, btn);
                 current_state.pop_held[btn] = true;
-
-            if (button->action == ACT_STATE_SET)
+            }
+            else  if (button->action == ACT_STATE_SET)
+            {
                 set_state(button->cfg_map);
+            }
             else
+            {
                 push_state(button->cfg_map);
+            }
         }
         else if (button->action == ACT_MOUSE_SLOW)
         {   // this way we can always clear the mouse_slow flag if the state changes.
@@ -255,18 +428,24 @@ void update_button(int btn, bool pressed)
             current_state.in_repeat[btn] = true;
             current_state.next_repeat[btn] = (current_ticks + current_state.repeat_delay);
         }
-
         if (button->keycode != 0)
         {
-            GPTK2_DEBUG("PRESS   '%s' -> '%s'\n", gbtn_names[btn], find_keycode(button->keycode));
+            GPTK2_DEBUG("PRESSED '%s' -> '%s'\n", gbtn_names[btn], find_keycode(button->keycode));
             emitKey(button->keycode, true, button->modifier);
         }
     }
     else if (was_released(btn))
     {
+        button = state_button(btn);
+
+        if (button == NULL)
+            return;
+
+        GPTK2_DEBUG("%s -> %s\n", gbtn_names[btn], (pressed ? "pressed" : "released"));
+
         if (current_state.pop_held[btn])
         {
-            pop_state();
+            pop_temp_state(btn);
             current_state.pop_held[btn] = false;
         }
 

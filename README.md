@@ -15,16 +15,16 @@ Gamepad to Keyboard/mouse/xbox360(gamepad) emulator
     cmake --build .
     strip gptokeyb
 
-## Use
+## Usage
 
-USAGE:
 ```bash
-gptokeyb2 -c "controls.ini" "program" &
+gptokeyb2 "program" -c "controls.ini" &
 ./program
 kill -9 $(pidof gptokeyb2)
 ```
 
-TO BE EXPLAINED:
+### Complex Example:
+
 ```ini
 [config]
 deadzone_triggers = 3000

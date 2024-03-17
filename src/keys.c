@@ -250,15 +250,15 @@ const button_match button_codes[] = {
     {"left", GBTN_DPAD_LEFT},
     {"right", GBTN_DPAD_RIGHT},
 
-    {"analog_left_up", GBTN_LEFT_ANALOG_UP},
-    {"analog_left_down", GBTN_LEFT_ANALOG_DOWN},
-    {"analog_left_left", GBTN_LEFT_ANALOG_LEFT},
-    {"analog_left_right", GBTN_LEFT_ANALOG_RIGHT},
+    {"left_analog_up", GBTN_LEFT_ANALOG_UP},
+    {"left_analog_down", GBTN_LEFT_ANALOG_DOWN},
+    {"left_analog_left", GBTN_LEFT_ANALOG_LEFT},
+    {"left_analog_right", GBTN_LEFT_ANALOG_RIGHT},
 
-    {"analog_right_up", GBTN_RIGHT_ANALOG_UP},
-    {"analog_right_down", GBTN_RIGHT_ANALOG_DOWN},
-    {"analog_right_left", GBTN_RIGHT_ANALOG_LEFT},
-    {"analog_right_right", GBTN_RIGHT_ANALOG_RIGHT},
+    {"right_analog_up", GBTN_RIGHT_ANALOG_UP},
+    {"right_analog_down", GBTN_RIGHT_ANALOG_DOWN},
+    {"right_analog_left", GBTN_RIGHT_ANALOG_LEFT},
+    {"right_analog_right", GBTN_RIGHT_ANALOG_RIGHT},
 
     {"dpad", GBTN_DPAD},
     {"left_analog", GBTN_LEFT_ANALOG},

@@ -134,8 +134,11 @@ void handleEventAxisFakeKeyboardMouseDevice(const SDL_Event *event)
 {
     bool left_axis_movement = false;
     bool right_axis_movement = false;
+    bool l2_movement = false;
+    bool r2_movement = false;
 
-    switch (event->caxis.axis) {
+    switch (event->caxis.axis)
+    {
     case SDL_CONTROLLER_AXIS_LEFTX:
         current_state.current_left_analog_x = event->caxis.value;
         left_axis_movement = true;
@@ -158,10 +161,12 @@ void handleEventAxisFakeKeyboardMouseDevice(const SDL_Event *event)
 
     case SDL_CONTROLLER_AXIS_TRIGGERLEFT:
         current_state.current_l2 = event->caxis.value;
+        l2_movement = true;
         break;
 
     case SDL_CONTROLLER_AXIS_TRIGGERRIGHT:
         current_state.current_r2 = event->caxis.value;
+        r2_movement = true;
         break;
     } // switch (event->caxis.axis)
 
@@ -176,11 +181,28 @@ void handleEventAxisFakeKeyboardMouseDevice(const SDL_Event *event)
     {
         deadzone_mouse_calc(
             &current_state.mouse_x, &current_state.mouse_y,
-            current_state.current_right_analog_x, current_state.current_right_analog_x);
+            current_state.current_right_analog_x, current_state.current_right_analog_y);
     }
     else
     {
-        update_button(GBTN_L2, current_state.current_l2 > current_state.deadzone_triggers);
-        update_button(GBTN_R2, current_state.current_r2 > current_state.deadzone_triggers);
+        if (left_axis_movement) {
+            update_button(GBTN_LEFT_ANALOG_UP,    current_state.current_left_analog_y < current_state.deadzone_y);
+            update_button(GBTN_LEFT_ANALOG_DOWN,  current_state.current_left_analog_y > current_state.deadzone_y);
+            update_button(GBTN_LEFT_ANALOG_LEFT,  current_state.current_left_analog_x < current_state.deadzone_x);
+            update_button(GBTN_LEFT_ANALOG_RIGHT, current_state.current_left_analog_x > current_state.deadzone_x);
+        }
+        if (right_axis_movement) {
+            update_button(GBTN_RIGHT_ANALOG_UP,    current_state.current_right_analog_y < current_state.deadzone_y);
+            update_button(GBTN_RIGHT_ANALOG_DOWN,  current_state.current_right_analog_y > current_state.deadzone_y);
+            update_button(GBTN_RIGHT_ANALOG_LEFT,  current_state.current_right_analog_x < current_state.deadzone_x);
+            update_button(GBTN_RIGHT_ANALOG_RIGHT, current_state.current_right_analog_x > current_state.deadzone_x);
+        }
+
     } // Analogs trigger keys 
+
+    if (l2_movement)
+        update_button(GBTN_L2, current_state.current_l2 > current_state.deadzone_triggers);
+
+    if (r2_movement)
+        update_button(GBTN_R2, current_state.current_r2 > current_state.deadzone_triggers);
 }

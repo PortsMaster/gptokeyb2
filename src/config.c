@@ -61,6 +61,12 @@ typedef struct
 
 gptokeyb_config *root_config = NULL;
 gptokeyb_config *config_stack[CFG_STACK_MAX];
+gptokeyb_config *config_temp_stack[GBTN_MAX];
+
+char default_control_name[MAX_CONTROL_NAME] = "";
+int config_temp_stack_order[GBTN_MAX];
+int config_temp_stack_order_id = 0;
+
 int gptokeyb_config_depth = 0;
 
 
@@ -117,6 +123,52 @@ const char *act_names[] = {
     "set_state",
 };
 
+#define MAX_DUMP_EXTRA_TEXT 50
+#define MAX_DUMP_EXTRA_TEXT_LINE 1024
+char *extra_dump_text[MAX_DUMP_EXTRA_TEXT];
+int extra_dump_offset = 0;
+
+
+int atoi_between(const char *value, int minimum, int maximum, int default_value)
+{
+    char *endptr;
+    long int result = strtol(value, &endptr, 10); // Assuming base 10
+
+    // Check if strtol encountered an error
+    if (endptr == value || *endptr != '\0')
+    {
+        // Conversion failed or non-numeric characters encountered
+        return default_value;
+    }
+
+    // Check if the result is within the specified range
+    if (result < minimum)
+        result = minimum;
+
+    else if (result > maximum)
+        result = maximum;
+
+    return (int)result;
+}
+
+
+bool atob_default(const char *value, bool default_value)
+{
+    if (strcasecmp(value, "true") == 0)
+        return true;
+
+    if (strcasecmp(value, "1") == 0)
+        return true;
+
+    if (strcasecmp(value, "false") == 0)
+        return false;
+
+    if (strcasecmp(value, "0") == 0)
+        return false;
+
+    return default_value;
+}
+
 
 int special_button_min(int btn)
 {
@@ -167,6 +219,15 @@ void config_init()
     {
         config_stack[i] = NULL;
     }
+
+    for (int btn=0; btn < GBTN_MAX; btn++)
+    {
+        config_temp_stack[btn] = NULL;
+        config_temp_stack_order[btn] = 0;
+    }
+
+    for (int i=0; i < MAX_DUMP_EXTRA_TEXT; i++)
+        extra_dump_text[i] = NULL;
 }
 
 
@@ -186,6 +247,14 @@ void config_quit()
     {
         config_stack[i] = NULL;
     }
+
+    for (int i=0; i < extra_dump_offset; i++)
+    {
+        free(extra_dump_text[i]);
+        extra_dump_text[i] = NULL;
+    }
+
+    extra_dump_offset = 0;
 }
 
 
@@ -197,16 +266,67 @@ void config_dump()
     printf("# CONFIG DUMP\n");
     printf("\n");
 
+    printf("[config]\n");
+    printf("\n");
+
+    printf("repeat_delay = %d\n", current_state.repeat_delay);
+    printf("repeat_rate = %d\n", current_state.repeat_rate);
+    printf("mouse_slow_scale = %d\n", current_state.mouse_slow_scale);
+    printf("deadzone_mode = %s\n", deadzone_mode_str(current_state.deadzone_mode));
+    printf("deadzone_scale = %d\n", current_state.deadzone_scale);
+    printf("deadzone_x = %d\n", current_state.deadzone_x);
+    printf("deadzone_y = %d\n", current_state.deadzone_y);
+    printf("deadzone_triggers = %d\n", current_state.deadzone_triggers);
+    printf("dpad_mouse_normalize = %s\n", (current_state.dpad_mouse_normalize ? "true" : "false" ));
+
+    if (strlen(default_control_name) > 0)
+        printf("controls = \"%s\"\n", default_control_name);
+
+    printf("\n");
+
     while (current != NULL)
     {
         printf("[%s]\n", current->name);
+
+        if (strcasecmp(current->name, "controls") == 0 && extra_dump_offset > 0)
+        {
+            printf("# Key bindings needing manual conversion.\n");
+            printf("#\n");
+
+            for (int i = 0; i < extra_dump_offset; i++)
+            {
+                printf("# %s\n", extra_dump_text[i]);
+            }
+
+            printf("\n");
+        }
+
         for (int btn=0; btn < GBTN_MAX; btn++)
         {
-            if ((current->dpad_as_mouse && btn == GBTN_DPAD_UP) ||
-                (current->left_analog_as_mouse && btn == GBTN_LEFT_ANALOG_UP) ||
-                (current->right_analog_as_mouse && btn == GBTN_RIGHT_ANALOG_UP))
+            if ((current->dpad_as_mouse != MOUSE_MOVEMENT_OFF && btn == GBTN_DPAD_UP) ||
+                (current->left_analog_as_mouse != MOUSE_MOVEMENT_OFF && btn == GBTN_LEFT_ANALOG_UP) ||
+                (current->right_analog_as_mouse != MOUSE_MOVEMENT_OFF && btn == GBTN_RIGHT_ANALOG_UP))
             {
-                printf("%s = mouse_movement\n", gbtn_names[btn]);
+                char *gbnt_name;
+                char *gbnt_mode;
+
+                if (btn == GBTN_DPAD_UP)
+                {
+                    gbnt_name = "dpad";
+                    gbnt_mode = ((current->dpad_as_mouse == MOUSE_MOVEMENT_ON) ? "mouse_movement" : "parent");
+                }
+                else if (btn == GBTN_LEFT_ANALOG_UP)
+                {
+                    gbnt_name = "left_analog";
+                    gbnt_mode = ((current->left_analog_as_mouse == MOUSE_MOVEMENT_ON) ? "mouse_movement" : "parent");
+                }
+                else if (btn == GBTN_RIGHT_ANALOG_UP)
+                {
+                    gbnt_name = "right_analog";
+                    gbnt_mode = ((current->right_analog_as_mouse == MOUSE_MOVEMENT_ON) ? "mouse_movement" : "parent");
+                }
+
+                printf("%s = %s\n", gbnt_name, gbnt_mode);
                 printf("\n");
                 btn += 3;
                 continue;
@@ -250,23 +370,31 @@ void config_dump()
 
 void config_overlay_clear(gptokeyb_config *current)
 {
+    current->dpad_as_mouse = MOUSE_MOVEMENT_OFF;
+    current->left_analog_as_mouse = MOUSE_MOVEMENT_OFF;
+    current->right_analog_as_mouse = MOUSE_MOVEMENT_OFF;
+
     for (int btn=0; btn < GBTN_MAX; btn++)
     {
-        current->button[btn].keycode = 0;
+        current->button[btn].keycode  = 0;
         current->button[btn].modifier = 0;
-        current->button[btn].action = ACT_NONE;
-        current->button[btn].repeat = false;
+        current->button[btn].action   = ACT_NONE;
+        current->button[btn].repeat   = false;
     }
 }
 
 void config_overlay_parent(gptokeyb_config *current)
 {
+    current->dpad_as_mouse = MOUSE_MOVEMENT_PARENT;
+    current->left_analog_as_mouse = MOUSE_MOVEMENT_PARENT;
+    current->right_analog_as_mouse = MOUSE_MOVEMENT_PARENT;
+
     for (int btn=0; btn < GBTN_MAX; btn++)
     {
-        current->button[btn].keycode = 0;
+        current->button[btn].keycode  = 0;
         current->button[btn].modifier = 0;
-        current->button[btn].action = ACT_PARENT;
-        current->button[btn].repeat = false;
+        current->button[btn].action   = ACT_PARENT;
+        current->button[btn].repeat   = false;
     }
 }
 
@@ -287,13 +415,16 @@ void config_overlay_named(gptokeyb_config *current, const char *name)
     }
 
     // fprintf(stderr, "overlay %s: \n", other->name);
+    current->dpad_as_mouse = other->dpad_as_mouse;
+    current->left_analog_as_mouse = other->left_analog_as_mouse;
+    current->right_analog_as_mouse = other->right_analog_as_mouse;
 
     for (int btn=0; btn < GBTN_MAX; btn++)
     {
-        current->button[btn].keycode = other->button[btn].keycode;
+        current->button[btn].keycode  = other->button[btn].keycode;
         current->button[btn].modifier = other->button[btn].modifier;
-        current->button[btn].action = other->button[btn].action;
-        current->button[btn].repeat = other->button[btn].repeat;
+        current->button[btn].action   = other->button[btn].action;
+        current->button[btn].repeat   = other->button[btn].repeat;
 
         if (current->button[btn].action >= ACT_STATE_HOLD)
         {
@@ -380,8 +511,83 @@ gptokeyb_config *config_create(const char *name)
 
 void set_cfg_config(const char *name, const char *value)
 {
-    return;
+    bool is_game_config = false;
+
+    if (strlen(game_prefix) > 0)
+    {
+        if (strcasestartswith(name, game_prefix))
+        {
+            name += strlen(game_prefix);
+            is_game_config = true;
+
+            if (name[0] == '_')
+                name += 1;
+
+            printf("GAME OVERRIDE: %s: %s = %s\n", game_prefix, name, value);
+        }
+    }
+
+    if (strcasecmp(name, "repeat_delay") == 0)
+        current_state.repeat_delay = atoi_between(value, 16, 3000, SDL_DEFAULT_REPEAT_DELAY);
+
+    else if (strcasecmp(name, "repeat_rate") == 0)
+        current_state.repeat_rate = atoi_between(value, 16, 3000, SDL_DEFAULT_REPEAT_INTERVAL);
+
+    else if (strcasecmp(name, "mouse_slow_scale") == 0)
+        current_state.mouse_slow_scale = atoi_between(value, 1, 100, 50);
+
+    else if (strcasecmp(name, "deadzone_mode") == 0)
+        current_state.deadzone_mode = deadzone_get_mode(value);
+
+    else if (strcasecmp(name, "deadzone_scale") == 0)
+        current_state.deadzone_scale = atoi_between(value, 1, 32768, 512);
+
+    else if (strcasecmp(name, "mouse_scale") == 0)
+        current_state.deadzone_scale = atoi_between(value, 1, 32768, 512);
+
+    else if (strcasecmp(name, "deadzone") == 0)
+        current_state.deadzone_x = current_state.deadzone_y = atoi_between(value, 500, 32768, 15000);
+
+    else if (strcasecmp(name, "deadzone_y") == 0)
+        current_state.deadzone_y = atoi_between(value, 500, 32768, 1000);
+
+    else if (strcasecmp(name, "deadzone_x") == 0)
+        current_state.deadzone_x = atoi_between(value, 500, 32768, 1000);
+
+    else if (strcasecmp(name, "deadzone_triggers") == 0)
+        current_state.deadzone_triggers = atoi_between(value, 500, 32768, 3000);
+
+    else if (strcasecmp(name, "dpad_mouse_normalize") == 0)
+        current_state.dpad_mouse_normalize = atob_default(value, true);
+
+    else if (strcasecmp(name, "mouse_delay") == 0)
+        ((void)0);
+
+    else if (strcasecmp(name, "deadzone_delay") == 0)
+        ((void)0);
+
+    else if (strcasecmp(name, "controls") == 0)
+        strncpy(default_control_name, value, MAX_CONTROL_NAME);
+
+    else if (is_game_config)
+        ((void)0);
+
+    else
+        fprintf(stderr, "unknown config: %s = %s\n", name, value);
 }
+
+static inline void set_btn_as_mouse(int btn, gptokeyb_config *config, int mode)
+{
+    if (GBTN_IS_DPAD(btn) || btn == GBTN_DPAD)
+        config->dpad_as_mouse = mode;
+
+    else if (GBTN_IS_LEFT_ANALOG(btn) || btn == GBTN_LEFT_ANALOG)
+        config->left_analog_as_mouse = mode;
+
+    else if (GBTN_IS_RIGHT_ANALOG(btn) || btn == GBTN_RIGHT_ANALOG)
+        config->right_analog_as_mouse = mode;
+}
+
 
 void set_btn_config(gptokeyb_config *config, int btn, const char *name, const char *value)
 {   // this parses a keybinding
@@ -455,6 +661,7 @@ void set_btn_config(gptokeyb_config *config, int btn, const char *name, const ch
                 return;
             }
 
+            set_btn_as_mouse(btn, config, MOUSE_MOVEMENT_OFF);
             config->button[btn].action = ACT_MOUSE_SLOW;
         }
         else if (strcasecmp(token, "hold_state") == 0)
@@ -470,6 +677,7 @@ void set_btn_config(gptokeyb_config *config, int btn, const char *name, const ch
             if (token == NULL)
                 return;
 
+            set_btn_as_mouse(btn, config, MOUSE_MOVEMENT_OFF);
             config->button[btn].action = ACT_STATE_HOLD;
             strncpy(config->button[btn].cfg_name, token, MAX_CONTROL_NAME);
             config->map_check = true;
@@ -487,6 +695,7 @@ void set_btn_config(gptokeyb_config *config, int btn, const char *name, const ch
             if (token == NULL)
                 return;
 
+            set_btn_as_mouse(btn, config, MOUSE_MOVEMENT_OFF);
             config->button[btn].action = ACT_STATE_PUSH;
             strncpy(config->button[btn].cfg_name, token, MAX_CONTROL_NAME);
             config->map_check = true;
@@ -503,6 +712,7 @@ void set_btn_config(gptokeyb_config *config, int btn, const char *name, const ch
                 return;
             }
 
+            set_btn_as_mouse(btn, config, MOUSE_MOVEMENT_OFF);
             config->button[btn].action = ACT_STATE_PUSH;
             strncpy(config->button[btn].cfg_name, token, MAX_CONTROL_NAME);
             config->map_check = true;
@@ -515,6 +725,7 @@ void set_btn_config(gptokeyb_config *config, int btn, const char *name, const ch
                 return;
             }
 
+            set_btn_as_mouse(btn, config, MOUSE_MOVEMENT_OFF);
             config->button[btn].action = ACT_STATE_POP;
         }
         else if ((strcasecmp(token, "add_alt") == 0) || (!first_run && (strcasecmp(token, "alt") == 0)))
@@ -569,6 +780,7 @@ void set_btn_config(gptokeyb_config *config, int btn, const char *name, const ch
         }
         else if (strcasecmp(token, "parent") == 0)
         {
+            set_btn_as_mouse(btn, config, MOUSE_MOVEMENT_PARENT);
             if (btn >= GBTN_MAX)
             {
                 for (int sbtn=special_button_min(btn); sbtn < special_button_max(btn); sbtn++)
@@ -587,6 +799,7 @@ void set_btn_config(gptokeyb_config *config, int btn, const char *name, const ch
         }
         else if (strcasecmp(token, "clear") == 0)
         {
+            set_btn_as_mouse(btn, config, MOUSE_MOVEMENT_OFF);
             if (btn >= GBTN_MAX)
             {
                 for (int sbtn=special_button_min(btn); sbtn < special_button_max(btn); sbtn++)
@@ -609,6 +822,8 @@ void set_btn_config(gptokeyb_config *config, int btn, const char *name, const ch
 
             if (key != NULL)
             {
+                set_btn_as_mouse(btn, config, MOUSE_MOVEMENT_OFF);
+
                 if (btn >= GBTN_MAX)
                 {
                     for (int sbtn=special_button_min(btn); sbtn < special_button_max(btn); sbtn++)
@@ -629,14 +844,7 @@ void set_btn_config(gptokeyb_config *config, int btn, const char *name, const ch
             {
                 if (btn >= GBTN_MAX)
                 {
-                    if (btn == GBTN_DPAD)
-                        config->dpad_as_mouse = true;
-
-                    else if (btn == GBTN_LEFT_ANALOG)
-                        config->left_analog_as_mouse = true;
-
-                    else if (btn == GBTN_RIGHT_ANALOG)
-                        config->right_analog_as_mouse = true;
+                    set_btn_as_mouse(btn, config, MOUSE_MOVEMENT_ON);
 
                     for (int sbtn=special_button_min(btn), i=0; sbtn < special_button_max(btn); sbtn++, i++)
                     {
@@ -654,14 +862,7 @@ void set_btn_config(gptokeyb_config *config, int btn, const char *name, const ch
             {
                 if (btn >= GBTN_MAX)
                 {
-                    if (btn == GBTN_DPAD)
-                        config->dpad_as_mouse = false;
-
-                    else if (btn == GBTN_LEFT_ANALOG)
-                        config->left_analog_as_mouse = false;
-
-                    else if (btn == GBTN_RIGHT_ANALOG)
-                        config->right_analog_as_mouse = false;
+                    set_btn_as_mouse(btn, config, MOUSE_MOVEMENT_OFF);
 
                     short keycodes[] = {KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT};
                     for (int sbtn=special_button_min(btn), i=0; sbtn < special_button_max(btn); sbtn++, i++)
@@ -728,11 +929,27 @@ static int config_ini_handler(
 
         if (button != NULL)
         {   // fixes things from old gptk files.
-            if ((GBTN_IS_DPAD(button->gbtn)) ||
-                (GBTN_IS_LEFT_ANALOG(button->gbtn)) ||
-                (GBTN_IS_RIGHT_ANALOG(button->gbtn)) &&
-                    (strcasestartswith(value, "mouse_movement_") == 0))
-                value = "mouse_movement";
+            if (strcasestartswith(value, "mouse_movement_"))
+            {
+                if (GBTN_IS_DPAD(button->gbtn))
+                {
+                    name = "dpad";
+                    value = "mouse_movement";
+                    button = find_button(name);
+                }
+                else if (GBTN_IS_LEFT_ANALOG(button->gbtn))
+                {
+                    name = "left_analog";
+                    value = "mouse_movement";
+                    button = find_button(name);
+                }
+                else if (GBTN_IS_RIGHT_ANALOG(button->gbtn))
+                {
+                    name = "right_analog";
+                    value = "mouse_movement";
+                    button = find_button(name);
+                }
+            }
 
             set_btn_config(config->current_config, button->gbtn, name, value);
             // GPTK2_DEBUG("G: %s: %s, (%s, %d)\n", name, value, button->str, button->gbtn);
@@ -758,6 +975,21 @@ static int config_ini_handler(
             {
                 // fprintf(stderr, "overlay = (blank)\n");
             }
+        }
+        else if (strcaseendswith(name, "_hk"))
+        {
+            char *temp = (char*)malloc(MAX_DUMP_EXTRA_TEXT_LINE);
+            if (temp == NULL)
+            {
+                fprintf(stderr, "Unable to allocate memory. :(");
+                exit(255);
+            }
+
+            memset((char*)temp, '\0', MAX_DUMP_EXTRA_TEXT_LINE);
+
+            snprintf(temp, MAX_DUMP_EXTRA_TEXT_LINE, "%s = %s", name, value);
+
+            extra_dump_text[extra_dump_offset++] = temp;
         }
         else
         {

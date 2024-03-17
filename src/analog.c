@@ -37,6 +37,10 @@
 
 #include "gptokeyb2.h"
 
+/* Code based on:
+ * https://github.com/Minimuino/thumbstick-deadzones
+ */
+
 float map_range(float value, float old_min, float old_max, float new_min, float new_max)
 {
     return (new_min + (new_max - new_min) * (value - old_min) / (old_max - old_min));
@@ -89,11 +93,16 @@ void vector2d_normalize(vector2d *vec2d)
 
 void dz_axial(vector2d *vec2d_ouput, const vector2d *vec2d_input, float deadzone)
 {
-    if (abs(vec2d_input->x) > deadzone)
+    if (fabs(vec2d_input->x) > deadzone)
         vec2d_ouput->x = vec2d_input->x;
 
-    if (abs(vec2d_input->y) < deadzone)
+    if (fabs(vec2d_input->y) > deadzone)
         vec2d_ouput->y = vec2d_input->y;
+
+    printf("axial: %-0.07f, %-0.07f -> %-0.07f -> %-0.07f, %-0.07f\n",
+        vec2d_input->x, vec2d_input->y,
+        deadzone,
+        vec2d_ouput->x, vec2d_ouput->y);
 }
 
 
@@ -130,10 +139,10 @@ void dz_sloped_axial(vector2d *vec2d_ouput, const vector2d *vec2d_input, float d
 
     vector2d_set_vector2d(vec2d_ouput, vec2d_input);
 
-    if (abs(vec2d_ouput->x) < deadzone_x)
+    if (fabs(vec2d_ouput->x) < deadzone_x)
         vec2d_ouput->x = 0.0;
 
-    if (abs(vec2d_ouput->y) < deadzone_y)
+    if (fabs(vec2d_ouput->y) < deadzone_y)
         vec2d_ouput->y = 0.0;
 }
 
@@ -146,12 +155,13 @@ void dz_sloped_scaled_axial(vector2d *vec2d_ouput, const vector2d *vec2d_input, 
 
     vector2d_set_float2(&sign, get_sign(vec2d_input->x), get_sign(vec2d_input->y));
 
-    if (abs(vec2d_input->x) > deadzone_x)
+    if (fabs(vec2d_input->x) > deadzone_x)
         vec2d_ouput->x = sign.x * map_range(abs(vec2d_input->x), deadzone_x, 1.0, 0.0, 1.0);
 
-    if (abs(vec2d_input->y) > deadzone_y)
+    if (fabs(vec2d_input->y) > deadzone_y)
         vec2d_ouput->y = sign.y * map_range(abs(vec2d_input->y), deadzone_y, 1.0, 0.0, 1.0);
 }
+
 
 void dz_hybrid(vector2d *vec2d_ouput, const vector2d *vec2d_input, float deadzone)
 {
@@ -167,6 +177,25 @@ void dz_hybrid(vector2d *vec2d_ouput, const vector2d *vec2d_input, float deadzon
 
     dz_sloped_scaled_axial(vec2d_ouput, &partial_output, deadzone);
 }
+
+
+void dz_exp(vector2d *vec2d_ouput, const vector2d *vec2d_input, float deadzone, float n)
+{
+    vector2d partial_output;
+    float input_magnitude;
+
+    vector2d_clear(&partial_output);
+
+    dz_scaled_radial(&partial_output, vec2d_input, deadzone);
+    input_magnitude = vector2d_magnitude(&partial_output);
+
+    if (abs(input_magnitude) < 0.0001)
+        return;
+
+    vec2d_ouput->x = (partial_output.x / input_magnitude) * pow(input_magnitude, n);
+    vec2d_ouput->y = (partial_output.y / input_magnitude) * pow(input_magnitude, n);
+}
+
 
 int deadzone_get_mode(const char *str)
 {
@@ -195,6 +224,35 @@ int deadzone_get_mode(const char *str)
     return DZ_DEFAULT;
 }
 
+const char *deadzone_mode_str(int mode)
+{
+
+    switch(current_state.deadzone_mode)
+    {
+    default:
+    case DZ_DEFAULT:
+        return "default";
+
+    case DZ_AXIAL:
+        return "axial";
+
+    case DZ_RADIAL:
+        return "radial";
+
+    case DZ_SCALED_RADIAL:
+        return "scaled_radial";
+
+    case DZ_SLOPED_AXIAL:
+        return "sloped_axial";
+
+    case DZ_SLOPED_SCALED_AXIAL:
+        return "sloped_scaled_axial";
+
+    case DZ_HYBRID:
+        return "hybrid";
+    }
+}
+
 
 void deadzone_trigger_calc(int *analog, int analog_in)
 {
@@ -212,8 +270,9 @@ void deadzone_mouse_calc(int *x, int *y, int in_x, int in_y)
     vector2d vec2d_ouput;
 
     vector2d_set_float2(&vec2d_input, (float)(in_x) / 32768.0f, (float)(in_y) / 32768.0f);
+    vector2d_clear(&vec2d_ouput);
 
-    float dz = (float)(current_state.deadzone) / 32768.0f;
+    float dz = (float)(current_state.deadzone_x) / 32768.0f;
 
     switch(current_state.deadzone_mode)
     {
@@ -244,7 +303,7 @@ void deadzone_mouse_calc(int *x, int *y, int in_x, int in_y)
         break;
     }
 
-    *x = (int)(vec2d_ouput.x * current_state.deadzone_scale);
-    *y = (int)(vec2d_ouput.y * current_state.deadzone_scale);
+    *x = (int)(vec2d_ouput.x * (float)current_state.deadzone_scale);
+    *y = (int)(vec2d_ouput.y * (float)current_state.deadzone_scale);
 }
 

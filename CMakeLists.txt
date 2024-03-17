@@ -32,13 +32,13 @@ include_directories(
 add_executable(gptokeyb2
     src/analog.c
     src/config.c
+    src/event.c
     src/ini.c
+    src/keyboard.c
     src/keys.c
     src/main.c
-    src/util.c
-    src/event.c
-    src/keyboard.c
     src/state.c
+    src/util.c
     src/xbox360.c
     )
 

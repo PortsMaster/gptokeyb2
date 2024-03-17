@@ -201,7 +201,6 @@ void handleEventAxisFakeKeyboardMouseDevice(const SDL_Event *event)
             update_button(GBTN_RIGHT_ANALOG_LEFT,  _ANALOG_AXIS_NEG(current_state.current_right_analog_x, current_state.deadzone_x));
             update_button(GBTN_RIGHT_ANALOG_RIGHT, _ANALOG_AXIS_POS(current_state.current_right_analog_x, current_state.deadzone_x));
         }
-
     } // Analogs trigger keys 
 
     if (l2_movement)

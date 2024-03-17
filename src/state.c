@@ -209,7 +209,7 @@ void state_update()
 
     for (int btn=0; btn < GBTN_MAX; btn++)
     {
-        if (!current_state.in_repeat[btn])
+        if (!(current_state.in_repeat & (1<<btn)))
             continue;
 
         if (!is_pressed(btn))
@@ -218,15 +218,15 @@ void state_update()
         if (!SDL_TICKS_PASSED(current_ticks, current_state.next_repeat[btn]))
             continue;
 
-        current_state.next_repeat[btn] = (current_ticks + current_state.repeat_rate);
-
         // release button
         update_button(btn, false);
 
         // press button
-        current_state.in_repeat[btn] = true;
+        current_state.in_repeat |= (1<<btn);
         current_state.last_pressed[btn] = false;
         update_button(btn, true);
+
+        current_state.next_repeat[btn] = (current_ticks + current_state.repeat_rate);
     }
 
     if (!current_left_analog_as_mouse && !current_right_analog_as_mouse)
@@ -363,7 +363,7 @@ const BUTTON_MAP *state_button(int btn)
 
         if (button->action != ACT_PARENT)
         {
-            GPTK2_DEBUG("found stack[%d] -> %s\n", current_depth, gbtn_names[btn]);
+            // GPTK2_DEBUG("found stack[%d] -> %s\n", current_depth, gbtn_names[btn]);
             return button;
         }
 
@@ -388,9 +388,9 @@ void update_button(int btn, bool pressed)
         if (button == NULL)
             return;
 
-        GPTK2_DEBUG("%s -> %s\n", gbtn_names[btn], (pressed ? "pressed" : "released"));
+        // GPTK2_DEBUG("%s -> %s\n", gbtn_names[btn], (pressed ? "pressed" : "released"));
 
-        if (!current_state.in_repeat[btn])
+        if (!(current_state.in_repeat & (1<<btn)))
         {
             current_state.held_since[btn] = current_ticks;
         }
@@ -423,9 +423,9 @@ void update_button(int btn, bool pressed)
         {   // this way we can always clear the mouse_move flag if the state changes.
             current_state.mouse_move |= (1<<btn);
         }
-        else if (button->repeat && !current_state.in_repeat[btn])
+        else if (button->repeat && !(current_state.in_repeat & (1<<btn)))
         {
-            current_state.in_repeat[btn] = true;
+            current_state.in_repeat |= (1<<btn);
             current_state.next_repeat[btn] = (current_ticks + current_state.repeat_delay);
         }
         if (button->keycode != 0)
@@ -441,7 +441,7 @@ void update_button(int btn, bool pressed)
         if (button == NULL)
             return;
 
-        GPTK2_DEBUG("%s -> %s\n", gbtn_names[btn], (pressed ? "pressed" : "released"));
+        // GPTK2_DEBUG("%s -> %s\n", gbtn_names[btn], (pressed ? "pressed" : "released"));
 
         if (current_state.pop_held[btn])
         {
@@ -452,7 +452,7 @@ void update_button(int btn, bool pressed)
         // Always clear the state of a mouse button if it is released.
         current_state.mouse_slow &= ~(1<<btn);
         current_state.mouse_move &= ~(1<<btn);
-        current_state.in_repeat[btn] = false;
+        current_state.in_repeat  &= ~(1<<btn);
 
         if (button->keycode != 0)
         {

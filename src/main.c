@@ -112,10 +112,23 @@ int main(int argc, char* argv[])
     int opt;
     char default_control[MAX_CONTROL_NAME] = "";
 
-    while ((opt = getopt(argc, argv, "g:hdxp:c:XPH:")) != -1)
+    while ((opt = getopt(argc, argv, "k1g:hdxp:c:ZXPH:s:")) != -1)
     {
         switch (opt)
         {
+        case 'k':
+        case '1':
+            // do nothing.
+            break;
+
+        case 's':
+            if (!want_sudo)
+            {
+                printf("Using sudo mode.\n");
+                want_sudo = true;
+            }
+            break;
+
         case 'X':
             if (!want_kill)
             {            
@@ -220,6 +233,28 @@ int main(int argc, char* argv[])
         if (i == 0)
         {
             strncpy(kill_process_name, argv[index], MAX_PROCESS_NAME);
+
+            if (strlen(game_prefix) == 0 && strlen(kill_process_name) > 0)
+            {
+                size_t kill_process_name_len = strlen(kill_process_name);
+
+                // strip these suffixes
+                char *suffixes[] = {".x86_64", ".x86", ".aarch64", ".arm64", ".armhf", ".arm", ".32", ".64"};
+                bool changed = false;
+
+                for (int i=0; i < (sizeof(suffixes) / sizeof(suffixes[0])); i++)
+                {
+                    if (strcaseendswith(kill_process_name, suffixes[i]))
+                    {
+                        strncpy(game_prefix, kill_process_name, kill_process_name_len - strlen(suffixes[i]));
+                        changed = true;
+                        break;
+                    }
+                }
+
+                if (!changed)
+                    strncpy(game_prefix, kill_process_name, MAX_PROCESS_NAME);
+            }
         }
         else
         {
@@ -229,8 +264,8 @@ int main(int argc, char* argv[])
 
     if (config_mode)
     {
-        // if (!do_dump_config && access(DEFAULT_CONFIG, F_OK) == 0)
-        if (access(user_config_file, F_OK) == 0)
+        if (!do_dump_config && access(user_config_file, F_OK) == 0)
+        // if (access(user_config_file, F_OK) == 0)
         {
             printf("Loading '%s'\n", user_config_file);
 
@@ -280,6 +315,9 @@ int main(int argc, char* argv[])
 
     if (strlen(kill_process_name) > 0)
         printf("Watching '%s'\n", kill_process_name);
+
+    if (strlen(game_prefix) > 0)
+        printf("Game prefix '%s'\n", game_prefix);
 
     // SDL initialization and main loop
     if (SDL_Init(SDL_INIT_GAMECONTROLLER | SDL_INIT_TIMER) != 0)
@@ -349,8 +387,18 @@ int main(int argc, char* argv[])
 
         state_update();
 
-        if (current_state.mouse_x != 0 || current_state.mouse_y != 0 || current_dpad_as_mouse)
+        if (current_state.mouse_x != 0 || current_state.mouse_y != 0 || current_dpad_as_mouse || current_state.in_repeat)
         {
+            if (current_state.in_repeat)
+            {            
+                // printf("%5dx%5d, %5dx%5d %08x\n",
+                //     current_state.current_left_analog_x,
+                //     current_state.current_left_analog_y,
+                //     current_state.current_right_analog_x,
+                //     current_state.current_right_analog_y,
+                //     current_state.in_repeat);
+            }
+
             mouse_x = current_state.mouse_x;
             mouse_y = current_state.mouse_y;
 

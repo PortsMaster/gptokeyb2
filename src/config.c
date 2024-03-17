@@ -569,11 +569,9 @@ void set_cfg_config(const char *name, const char *value)
     else if (strcasecmp(name, "controls") == 0)
         strncpy(default_control_name, value, MAX_CONTROL_NAME);
 
-    else if (is_game_config)
-        ((void)0);
-
+    
     else
-        fprintf(stderr, "unknown config: %s = %s\n", name, value);
+        fprintf(stderr, "Unknown config: %s = %s\n", name, value);
 }
 
 static inline void set_btn_as_mouse(int btn, gptokeyb_config *config, int mode)

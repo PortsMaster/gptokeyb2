@@ -248,7 +248,7 @@ typedef struct
     int deadzone_y;
     int deadzone_triggers;
 
-    bool in_repeat[GBTN_MAX];
+    Uint32 in_repeat;
     Uint32 held_since[GBTN_MAX];
     Uint32 next_repeat[GBTN_MAX];
 

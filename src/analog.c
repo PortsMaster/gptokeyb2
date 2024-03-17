@@ -98,11 +98,6 @@ void dz_axial(vector2d *vec2d_ouput, const vector2d *vec2d_input, float deadzone
 
     if (fabs(vec2d_input->y) > deadzone)
         vec2d_ouput->y = vec2d_input->y;
-
-    printf("axial: %-0.07f, %-0.07f -> %-0.07f -> %-0.07f, %-0.07f\n",
-        vec2d_input->x, vec2d_input->y,
-        deadzone,
-        vec2d_ouput->x, vec2d_ouput->y);
 }
 
 

@@ -279,12 +279,12 @@ int main(int argc, char* argv[])
     }
 
     if (strlen(kill_process_name) > 0)
-        printf("Watching %s\n", kill_process_name);
+        printf("Watching '%s'\n", kill_process_name);
 
     // SDL initialization and main loop
     if (SDL_Init(SDL_INIT_GAMECONTROLLER | SDL_INIT_TIMER) != 0)
     {
-        printf("SDL_Init() failed: %s\n", SDL_GetError());
+        fprintf(stderr, "SDL_Init() failed: %s\n", SDL_GetError());
         return -1;
     }
 
@@ -376,8 +376,8 @@ int main(int argc, char* argv[])
                 mouse_y = (int)((float)(mouse_y) / slow_scale);
             }
 
-            if (mouse_x != 0 || mouse_y != 0)
-                GPTK2_DEBUG("mouse move %d %d\n", mouse_x, mouse_y);
+            // if (mouse_x != 0 || mouse_y != 0)
+            //     GPTK2_DEBUG("mouse move %d %d\n", mouse_x, mouse_y);
 
             emitMouseMotion(mouse_x, mouse_y);
 
@@ -386,7 +386,7 @@ int main(int argc, char* argv[])
         }
         else
         {
-            GPTK2_DEBUG("-- WAIT FOR EVENT --\n");
+            // GPTK2_DEBUG("-- WAIT FOR EVENT --\n");
             if (!SDL_WaitEvent(&event))
             {
                 printf("SDL_WaitEvent() failed: %s\n", SDL_GetError());

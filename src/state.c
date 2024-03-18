@@ -161,7 +161,7 @@ bool is_pressed(int btn)
     if (btn < 0 || btn > GBTN_MAX)
         return false;
 
-    return current_state.pressed[btn];
+    return (current_state.pressed & (1<<btn)) != 0;
 }
 
 bool was_pressed(int btn)
@@ -169,7 +169,7 @@ bool was_pressed(int btn)
     if (btn < 0 || btn > GBTN_MAX)
         return false;
 
-    return (current_state.pressed[btn] && !current_state.last_pressed[btn]);
+    return (((current_state.pressed & (1<<btn)) != 0) && ((current_state.last_pressed & (1<<btn)) == 0));
 }
 
 bool was_released(int btn)
@@ -177,7 +177,7 @@ bool was_released(int btn)
     if (btn < 0 || btn > GBTN_MAX)
         return false;
 
-    return (!current_state.pressed[btn] && current_state.last_pressed[btn]);
+    return (((current_state.pressed & (1<<btn)) == 0) && ((current_state.last_pressed & (1<<btn)) != 0));
 }
 
 Uint32 held_for(int btn)
@@ -202,14 +202,11 @@ void state_update()
             current_state.running = false;
     }
 
-    for (int btn=0; btn < GBTN_MAX; btn++)
-    {
-        current_state.last_pressed[btn] = current_state.pressed[btn];
-    }
+    current_state.last_pressed = current_state.pressed;
 
     for (int btn=0; btn < GBTN_MAX; btn++)
     {
-        if (!(current_state.in_repeat & (1<<btn)))
+        if ((current_state.in_repeat & (1<<btn)) == 0)
             continue;
 
         if (!is_pressed(btn))
@@ -222,8 +219,8 @@ void state_update()
         update_button(btn, false);
 
         // press button
-        current_state.in_repeat |= (1<<btn);
-        current_state.last_pressed[btn] = false;
+        current_state.in_repeat    |=  (1<<btn);
+        current_state.last_pressed &= ~(1<<btn);
         update_button(btn, true);
 
         current_state.next_repeat[btn] = (current_ticks + current_state.repeat_rate);
@@ -323,9 +320,9 @@ void state_change_update()
 }
 
 
-const BUTTON_MAP *state_button(int btn)
+const gptokeyb_button *state_button(int btn)
 {   // resolve a button through parent states.
-    BUTTON_MAP *button;
+    gptokeyb_button *button;
 
     // check temp states
     int order_id = config_temp_stack_order_id;
@@ -363,7 +360,7 @@ const BUTTON_MAP *state_button(int btn)
 
         if (button->action != ACT_PARENT)
         {
-            // GPTK2_DEBUG("found stack[%d] -> %s\n", current_depth, gbtn_names[btn]);
+            GPTK2_DEBUG("found stack[%d] -> %s\n", current_depth, gbtn_names[btn]);
             return button;
         }
 
@@ -376,10 +373,14 @@ const BUTTON_MAP *state_button(int btn)
 
 void update_button(int btn, bool pressed)
 {
+    Uint32 btn_mask = (1<<btn);
     Uint32 current_ticks = SDL_GetTicks();
-    const BUTTON_MAP *button;
+    const gptokeyb_button *button;
 
-    current_state.pressed[btn] = pressed;
+    if (pressed)
+        current_state.pressed |=  btn_mask;
+    else
+        current_state.pressed &= ~btn_mask;
 
     if (was_pressed(btn))
     {
@@ -390,7 +391,7 @@ void update_button(int btn, bool pressed)
 
         // GPTK2_DEBUG("%s -> %s\n", gbtn_names[btn], (pressed ? "pressed" : "released"));
 
-        if (!(current_state.in_repeat & (1<<btn)))
+        if ((current_state.in_repeat & btn_mask) == 0)
         {
             current_state.held_since[btn] = current_ticks;
         }
@@ -399,12 +400,13 @@ void update_button(int btn, bool pressed)
         {
             pop_state();
         }
+
         else if (button->action >= ACT_STATE_HOLD)
         {   // change control state
             if (button->action == ACT_STATE_HOLD)
             {
                 push_temp_state(button->cfg_map, btn);
-                current_state.pop_held[btn] = true;
+                current_state.pop_held |= btn_mask;
             }
             else  if (button->action == ACT_STATE_SET)
             {
@@ -417,15 +419,15 @@ void update_button(int btn, bool pressed)
         }
         else if (button->action == ACT_MOUSE_SLOW)
         {   // this way we can always clear the mouse_slow flag if the state changes.
-            current_state.mouse_slow |= (1<<btn);
+            current_state.mouse_slow |= btn_mask;
         }
         else if (GBTN_IS_DPAD(btn) && current_dpad_as_mouse)
         {   // this way we can always clear the mouse_move flag if the state changes.
-            current_state.mouse_move |= (1<<btn);
+            current_state.mouse_move |= btn_mask;
         }
-        else if (button->repeat && !(current_state.in_repeat & (1<<btn)))
+        else if (button->repeat && !(current_state.in_repeat & btn_mask))
         {
-            current_state.in_repeat |= (1<<btn);
+            current_state.in_repeat |= btn_mask;
             current_state.next_repeat[btn] = (current_ticks + current_state.repeat_delay);
         }
         if (button->keycode != 0)
@@ -443,16 +445,16 @@ void update_button(int btn, bool pressed)
 
         // GPTK2_DEBUG("%s -> %s\n", gbtn_names[btn], (pressed ? "pressed" : "released"));
 
-        if (current_state.pop_held[btn])
+        if ((current_state.pop_held & btn_mask) != 0)
         {
             pop_temp_state(btn);
-            current_state.pop_held[btn] = false;
+            current_state.pop_held &= ~btn_mask;
         }
 
         // Always clear the state of a mouse button if it is released.
-        current_state.mouse_slow &= ~(1<<btn);
-        current_state.mouse_move &= ~(1<<btn);
-        current_state.in_repeat  &= ~(1<<btn);
+        current_state.mouse_slow &= ~btn_mask;
+        current_state.mouse_move &= ~btn_mask;
+        current_state.in_repeat  &= ~btn_mask;
 
         if (button->keycode != 0)
         {

@@ -45,6 +45,7 @@ const keyboard_values keyboard_codes[] = {
     {"mouse_left",  BTN_LEFT,        0},
     {"mouse_right", BTN_RIGHT,       0},
     {"space",       KEY_SPACE,       0},
+    {" ",           KEY_SPACE,       0},
     {"esc",         KEY_ESC,         0},
     {"end",         KEY_END,         0},
     {"home",        KEY_HOME,        0},
@@ -169,8 +170,8 @@ const keyboard_values keyboard_codes[] = {
     {"f11", KEY_F11, 0},
     {"f12", KEY_F12, 0},
 
-    {"\"", KEY_APOSTROPHE, MOD_SHIFT},
     {"\'", KEY_APOSTROPHE,         0},
+    {"\"", KEY_APOSTROPHE, MOD_SHIFT},
 
     {";", KEY_SEMICOLON,           0},
     {"/", KEY_SLASH,               0},
@@ -214,6 +215,7 @@ const keyboard_values *find_keyboard(const char *key)
     return NULL;
 }
 
+
 const char *find_keycode(short keycode)
 {
     int num_pairs = sizeof(keyboard_codes) / sizeof(keyboard_codes[0]);
@@ -241,9 +243,10 @@ const button_match button_codes[] = {
     {"r2", GBTN_R2},
     {"r3", GBTN_R3},
 
-    {"start", GBTN_START},
-    {"back", GBTN_BACK},
-    {"guide", GBTN_GUIDE},
+    {"start",  GBTN_START},
+    {"back",   GBTN_BACK},
+    {"select", GBTN_BACK},
+    {"guide",  GBTN_GUIDE},
 
     {"up", GBTN_DPAD_UP},
     {"down", GBTN_DPAD_DOWN},

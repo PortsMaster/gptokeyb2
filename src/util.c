@@ -37,6 +37,179 @@
 
 #include "gptokeyb2.h"
 
+typedef struct _string_reg
+{
+    struct _string_reg *next;
+    int counter;
+    char *string;
+} string_reg;
+
+static string_reg *root_string = NULL;
+static int string_reg_last_reorder_counter=0;
+
+
+void *gptk_malloc(size_t size)
+{
+    void *data = malloc(size);
+    if (data == NULL)
+    {
+        fprintf(stderr, "Unable to allocate memory. :(\n");
+        exit(255);
+    }
+
+    memset(data, '\0', size);
+    return data;
+}
+
+
+struct _token_ctx
+{
+    char separator;
+    char *next_token;
+    char *curr_token;
+    size_t total_size;
+    char full_buffer[];
+};
+
+
+token_ctx *tokens_create(const char *input_text, char separator)
+{
+    size_t input_len = strlen(input_text) + 1; // +1 for null terminator
+    size_t total_size = sizeof(token_ctx) + input_len; // Total size including struct and input text
+    token_ctx *token_state = (token_ctx *)gptk_malloc(total_size);
+
+    token_state->separator = separator;
+    token_state->total_size = total_size;
+    strcpy(token_state->full_buffer, input_text);
+    token_state->curr_token = NULL;
+    token_state->next_token = token_state->full_buffer;
+
+    return token_state;
+}
+
+
+void tokens_free(token_ctx *token_state)
+{
+    free(token_state);
+}
+
+
+const char *tokens_next(token_ctx *token_state)
+{
+    if (token_state->next_token == NULL)
+        return NULL;
+
+    if (token_state->curr_token != NULL)
+        *(token_state->next_token-1) = token_state->separator;
+
+    token_state->curr_token = token_state->next_token;
+
+    // Find the next separator
+    token_state->next_token = strchr(token_state->next_token, token_state->separator);
+    if (token_state->next_token != NULL)
+        *(token_state->next_token++) = '\0';
+
+    return token_state->curr_token;
+}
+
+
+const char *tokens_prev(token_ctx *token_state)
+{
+    if (token_state->curr_token == NULL)
+        return NULL;
+
+    if (token_state->next_token != NULL)
+        *(token_state->next_token-1) = token_state->separator;
+
+    if (token_state->curr_token == token_state->full_buffer)
+    {
+        token_state->curr_token = NULL;
+        token_state->next_token = token_state->full_buffer;
+        return NULL;        
+    }
+
+    char *prev_separator_pos = token_state->curr_token - 2;
+    while (prev_separator_pos >= token_state->full_buffer && *prev_separator_pos != token_state->separator)
+        prev_separator_pos--;
+
+    if (prev_separator_pos < token_state->full_buffer)
+    {
+        prev_separator_pos = token_state->full_buffer;
+    }
+
+    if (*prev_separator_pos == token_state->separator)
+        prev_separator_pos++;
+
+    token_state->curr_token = prev_separator_pos;
+    token_state->next_token = strchr(token_state->curr_token, token_state->separator);
+    if (token_state->next_token != NULL)
+        *(token_state->next_token++) = '\0';
+
+    return token_state->curr_token;
+}
+
+
+const char *tokens_curr(token_ctx *token_state)
+{
+    return token_state->curr_token;
+}
+
+
+const char *tokens_rest(token_ctx *token_state)
+{
+    return token_state->next_token;
+}
+
+
+char *tabulate_text(const char *text)
+{  
+    char *temp_buffer;
+    int text_len = strlen(text);
+
+    if (text_len == 0)
+        return NULL;
+
+    temp_buffer = (char*)gptk_malloc(text_len+1);
+
+    int t=0;
+    int i=0;
+
+    while (i < text_len)
+    {
+        if (text[i] == '"' || text[i] == '\'')
+        {
+            char c = text[i];
+            i += 1;
+
+            while (text[i] != c && i < text_len)
+                temp_buffer[t++] = text[i++];
+
+            temp_buffer[t++] = '\t';
+            i++;
+        }
+        else if (text[i] == ' ' || text[i] == '\t')
+        {
+            if (t > 0 && temp_buffer[t-1] != '\t')
+                temp_buffer[t++] = '\t';
+            i++;
+
+            while ((text[i] == ' ' || text[i] == '\t') && i < text_len)
+                i++;
+        }
+        else
+        {
+            temp_buffer[t++] = text[i++];
+
+            while (text[i] != ' ' && text[i] != '\t' && i < text_len)
+                temp_buffer[t++] = text[i++];
+        }
+    }
+    temp_buffer[t] = '\0';
+
+    return temp_buffer;
+}
+
+
 // THANKS CHATGPT
 bool strendswith(const char *str, const char *suffix)
 {
@@ -52,6 +225,7 @@ bool strendswith(const char *str, const char *suffix)
     return strncmp(str + lenstr - lensuffix, suffix, lensuffix) == 0;
 }
 
+
 bool strcaseendswith(const char *str, const char *suffix)
 {
     if (!str || !suffix)
@@ -65,6 +239,7 @@ bool strcaseendswith(const char *str, const char *suffix)
 
     return strncasecmp(str + lenstr - lensuffix, suffix, lensuffix) == 0;
 }
+
 
 bool strstartswith(const char *str, const char *prefix)
 {
@@ -126,6 +301,7 @@ void emit(int type, int code, int val)
     write(uinp_fd, &ev, sizeof(ev));
 }
 
+
 void emitModifier(bool pressed, int modifier)
 {
     if ((modifier & MOD_SHIFT) != 0)
@@ -147,6 +323,7 @@ void emitModifier(bool pressed, int modifier)
     }
 }
 
+
 void emitKey(int code, bool pressed, int modifier)
 {
     if (code == 0)
@@ -161,6 +338,7 @@ void emitKey(int code, bool pressed, int modifier)
     if ((modifier != 0) && !(pressed))
         emitModifier(pressed, modifier);
 }
+
 
 void emitTextInputKey(int code, bool uppercase)
 {
@@ -186,6 +364,7 @@ void emitAxisMotion(int code, int value)
     emit(EV_ABS, code, value);
     emit(EV_SYN, SYN_REPORT, 0);
 }
+
 
 void emitMouseMotion(int x, int y)
 {
@@ -291,6 +470,7 @@ bool process_with_kill(const char *process_name, bool use_sudo)
     return status;
 }
 
+
 bool process_with_pc_quit()
 {
     emitKey(KEY_F4, true, KEY_LEFTALT);
@@ -299,6 +479,7 @@ bool process_with_pc_quit()
     emitKey(KEY_F4, false, KEY_LEFTALT);
     SDL_Delay(15);
 }
+
 
 bool process_kill()
 {
@@ -312,4 +493,82 @@ bool process_kill()
         return process_with_kill(kill_process_name, want_sudo);
 
     return process_with_pkill(kill_process_name, want_sudo);
+}
+
+
+string_reg *string_reg_create(const char *string)
+{
+    if (string == NULL)
+        return NULL;
+
+    string_reg *current_string = (string_reg *)gptk_malloc(sizeof(string_reg));
+    size_t string_len = strlen(string);
+
+    current_string->string = (char *)gptk_malloc(string_len + 1);
+
+    strncpy(current_string->string, string, strlen(string));
+
+    return current_string;
+}
+
+void string_init()
+{
+    root_string = string_reg_create("controls");
+}
+
+void string_quit()
+{
+    string_reg *current_string = root_string;
+    string_reg *next_string;
+    int total_strings = 0;
+    int total_lookups = 0;
+    int lookup_factor = 0;
+
+    // printf("# String Quit\n");
+    int i=1;
+    while (current_string != NULL)
+    {
+        next_string = current_string->next;
+
+        total_strings++;
+        total_lookups += current_string->counter;
+        lookup_factor += i * current_string->counter;
+
+        // printf("# - %s\n", current_string->string);
+        free(current_string->string);
+        free(current_string);
+
+        current_string = next_string;
+        i++;
+    }
+
+    // printf("# Stats: %d, %d, %d\n", total_strings, total_lookups, lookup_factor);
+}
+
+const char *string_register(const char *string)
+{
+    if (string == NULL)
+        return NULL;
+
+    string_reg *current_string = root_string;
+    string_reg *last_string;
+
+    while (current_string != NULL)
+    {
+        last_string = current_string;
+
+        if (strcmp(current_string->string, string) == 0)
+        {
+            current_string->counter++;
+            return current_string->string;
+        }
+
+        current_string = current_string->next;
+    }
+
+    current_string = string_reg_create(string);
+    current_string->counter++;
+    last_string->next = current_string;
+
+    return current_string->string;
 }

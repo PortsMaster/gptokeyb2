@@ -55,6 +55,8 @@
 
 #include <SDL.h>
 
+#define GPTK2_VERSION "2.00.01"
+
 #define GPTK2_DEBUG_ENABLED
 
 // DEBUGGAH
@@ -82,6 +84,8 @@
 // THIS IS REDICULOUS, STOP IT.
 #define CFG_STACK_MAX 16
 
+#define FN_ID_MAX 16
+
 // keyboard mods
 #define MOD_SHIFT 0x01
 #define MOD_CTRL  0x02
@@ -104,6 +108,7 @@ enum
 // BUTTON DEFS
 enum
 {
+    GBTN_NONE = -1,
     GBTN_A,
     GBTN_B,
     GBTN_X,
@@ -175,11 +180,11 @@ enum
     ACT_STATE_SET,
 };
 
-enum
-{
-    OPT_INT,
-    OPT_STR,
-};
+typedef struct _fn_data_store fn_data_store;
+
+// simple tokenizer
+typedef struct _token_ctx token_ctx;
+
 
 #define MOUSE_MOVEMENT_PARENT -1
 #define MOUSE_MOVEMENT_OFF 0
@@ -194,33 +199,47 @@ typedef struct
     bool repeat;
     int action;
 
-    char cfg_name[MAX_CONTROL_NAME];
+    int fn_id;
+    fn_data_store *fn_data;
+
+    const char *cfg_name;
     gptokeyb_config *cfg_map;
-} BUTTON_MAP;
+} gptokeyb_button;
 
 
 struct _gptokeyb_config
 {
     gptokeyb_config *next;
-    char name[MAX_CONTROL_NAME];
+    const char *name;
 
     // one of MOUSE_MOVEMENT_PARENT / OFF / ON
     int left_analog_as_mouse;
     int right_analog_as_mouse;
     int dpad_as_mouse;
 
+    int fn_ids[FN_ID_MAX];
+    fn_data_store *fn_data;
+
     bool map_check;
-    BUTTON_MAP button[GBTN_MAX];
+    gptokeyb_button button[GBTN_MAX];
 };
 
 
 
 typedef struct
 {
-    bool pressed[GBTN_MAX];
-    bool last_pressed[GBTN_MAX];
+    Uint32 pressed;
+    Uint32 last_pressed;
+    Uint32 pop_held;
 
-    bool pop_held[GBTN_MAX];
+    Uint32 mouse_slow;
+    Uint32 mouse_move;
+
+    Uint32 in_repeat;
+    Uint32 held_since[GBTN_MAX];
+    Uint32 next_repeat[GBTN_MAX];
+
+    int fnc_ids[FN_ID_MAX];
 
     int current_left_analog_x;
     int current_left_analog_y;
@@ -234,9 +253,6 @@ typedef struct
     int mouse_x;
     int mouse_y;
 
-    Uint32 mouse_slow;
-    Uint32 mouse_move;
-
     int dpad_mouse_step;
     int mouse_slow_scale;
     bool dpad_mouse_normalize;
@@ -247,10 +263,6 @@ typedef struct
     int deadzone_x;
     int deadzone_y;
     int deadzone_triggers;
-
-    Uint32 in_repeat;
-    Uint32 held_since[GBTN_MAX];
-    Uint32 next_repeat[GBTN_MAX];
 
     int hotkey_gbtn;
     bool running;
@@ -283,12 +295,29 @@ typedef struct {
     short modifier;
 } keyboard_values;
 
+
+// keyboard stuff
+typedef struct {
+    char *name;
+    char *characters;
+} char_set;
+
+
 // Basic vector 2d class for better analog deadzone code
 typedef struct
 {
     float x;
     float y;
 } vector2d;
+
+
+// function functions
+typedef bool (*fn_assign  )(gptokeyb_config *config, int btn);
+typedef void (*fn_validate)(gptokeyb_config *config);
+typedef void (*fn_config   )(gptokeyb_config *config, int mode);
+typedef void (*fn_button  )(gptokeyb_config *config, int btn, bool pressed);
+typedef void (*fn_tick    )(gptokeyb_config *config);
+
 
 // some stuff
 extern const keyboard_values keyboard_codes[];
@@ -355,7 +384,30 @@ const char *find_keycode(short keycode);
 const button_match *find_button(const char *key);
 void set_hotkey(int gbtn);
 
+// functions.c
+
+void  function_store_set(fn_data_store **store, int fnc_id, void *data);
+void *function_store_get(fn_data_store **store, int fnc_id);
+void  function_store_clear(fn_data_store **store, int fnc_id);
+void  function_state_clear_all(fn_data_store **store);
+
+void functions_init();
+void functions_quit();
+int function_register(const char *name, fn_assign *assign_func, fn_validate *validate_func, fn_config *layer_func, fn_button *key_func, fn_tick *tick_func);
+bool function_config(gptokeyb_config *config, const char *name);
+
 // util.c -- CHATGPT
+void *gptk_malloc(size_t);
+
+token_ctx *tokens_create(const char *input_text, char separator);
+void tokens_free(token_ctx *token_state);
+const char *tokens_next(token_ctx *token_state);
+const char *tokens_prev(token_ctx *token_state);
+const char *tokens_curr(token_ctx *token_state);
+const char *tokens_rest(token_ctx *token_state);
+
+char *tabulate_text(const char *text);
+
 bool strendswith(const char *str, const char *suffix);
 bool strcaseendswith(const char *str, const char *suffix);
 
@@ -367,6 +419,10 @@ int strncasecmp(const char *s1, const char *s2, size_t n);
 
 bool process_kill();
 
+void string_init();
+void string_quit();
+const char *string_register(const char *string);
+
 // from og gptokeyb
 void emit(int type, int code, int val);
 void emitMouseMotion(int x, int y);
@@ -374,6 +430,10 @@ void emitAxisMotion(int code, int value);
 void emitTextInputKey(int code, bool uppercase);
 void emitKey(int code, bool is_pressed, int modifier);
 void handleAnalogTrigger(bool is_triggered, bool *was_triggered, int key, int modifier);
+
+// input.c
+const char_set *find_char_set(const char *name);
+void input_init();
 
 // state.c
 bool is_pressed(int btn);

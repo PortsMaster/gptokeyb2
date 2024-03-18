@@ -69,6 +69,11 @@ int config_temp_stack_order_id = 0;
 
 int gptokeyb_config_depth = 0;
 
+#define GPTK_HK_FIX_MAX 50
+#define GPTK_HK_FIX_MAX_LINE 1024
+char *gptk_hk_fix_text[GPTK_HK_FIX_MAX];
+int gptk_hk_fix_offset = 0;
+int gptk_hk_can_fix = true;
 
 const char *gbtn_names[] = {
     "a",
@@ -122,12 +127,6 @@ const char *act_names[] = {
     "push_state",
     "set_state",
 };
-
-#define MAX_DUMP_EXTRA_TEXT 50
-#define MAX_DUMP_EXTRA_TEXT_LINE 1024
-char *extra_dump_text[MAX_DUMP_EXTRA_TEXT];
-int extra_dump_offset = 0;
-
 
 int atoi_between(const char *value, int minimum, int maximum, int default_value)
 {
@@ -202,15 +201,10 @@ int special_button_max(int btn)
 
 void config_init()
 {   // Setup config structures.
-    root_config = (gptokeyb_config*)malloc(sizeof(gptokeyb_config));
-    if (root_config == NULL)
-    {
-        fprintf(stderr, "Unable to allocate memory. :(");
-        exit(255);
-    }
+    root_config = (gptokeyb_config*)gptk_malloc(sizeof(gptokeyb_config));
 
-    memset((void*)root_config, '\0', sizeof(gptokeyb_config));
-    strcpy(root_config->name, "controls");
+    root_config->name = string_register("controls");
+
     gptokeyb_config_depth = 0;
 
     config_stack[0] = root_config;
@@ -226,8 +220,8 @@ void config_init()
         config_temp_stack_order[btn] = 0;
     }
 
-    for (int i=0; i < MAX_DUMP_EXTRA_TEXT; i++)
-        extra_dump_text[i] = NULL;
+    for (int i=0; i < GPTK_HK_FIX_MAX; i++)
+        gptk_hk_fix_text[i] = NULL;
 }
 
 
@@ -239,6 +233,7 @@ void config_quit()
     while (current != NULL)
     {
         next = current->next;
+
         free(current);
         current = next;
     }
@@ -248,13 +243,13 @@ void config_quit()
         config_stack[i] = NULL;
     }
 
-    for (int i=0; i < extra_dump_offset; i++)
+    for (int i=0; i < gptk_hk_fix_offset; i++)
     {
-        free(extra_dump_text[i]);
-        extra_dump_text[i] = NULL;
+        free(gptk_hk_fix_text[i]);
+        gptk_hk_fix_text[i] = NULL;
     }
 
-    extra_dump_offset = 0;
+    gptk_hk_fix_offset = 0;
 }
 
 
@@ -267,8 +262,6 @@ void config_dump()
     printf("\n");
 
     printf("[config]\n");
-    printf("\n");
-
     printf("repeat_delay = %d\n", current_state.repeat_delay);
     printf("repeat_rate = %d\n", current_state.repeat_rate);
     printf("mouse_slow_scale = %d\n", current_state.mouse_slow_scale);
@@ -287,19 +280,6 @@ void config_dump()
     while (current != NULL)
     {
         printf("[%s]\n", current->name);
-
-        if (strcasecmp(current->name, "controls") == 0 && extra_dump_offset > 0)
-        {
-            printf("# Key bindings needing manual conversion.\n");
-            printf("#\n");
-
-            for (int i = 0; i < extra_dump_offset; i++)
-            {
-                printf("# %s\n", extra_dump_text[i]);
-            }
-
-            printf("\n");
-        }
 
         for (int btn=0; btn < GBTN_MAX; btn++)
         {
@@ -336,20 +316,30 @@ void config_dump()
 
             if (current->button[btn].keycode != 0)
             {
-                printf(" \"%s\"", find_keycode(current->button[btn].keycode));
+                const char *key_str = find_keycode(current->button[btn].keycode);
+                if (strcmp(key_str, "\"") == 0)
+                    printf(" \'%s\'", key_str);
+                else
+                    printf(" \"%s\"", key_str);
 
                 if ((current->button[btn].modifier & MOD_ALT) != 0)
-                    printf(" mod_alt");
+                    printf(" add_alt");
 
                 if ((current->button[btn].modifier & MOD_SHIFT) != 0)
-                    printf(" mod_shift");
+                    printf(" add_shift");
 
                 if ((current->button[btn].modifier & MOD_CTRL) != 0)
-                    printf(" mod_ctrl");
+                    printf(" add_ctrl");
             }
 
             if (current->button[btn].action != 0)
-                printf(" %s %s", act_names[current->button[btn].action], current->button[btn].cfg_name);
+            {
+                if (current->button[btn].cfg_name != NULL)
+                    printf(" %s %s", act_names[current->button[btn].action], current->button[btn].cfg_name);
+
+                else
+                    printf(" %s", act_names[current->button[btn].action]);
+            }
 
             if (current->button[btn].repeat)
                 printf(" repeat");
@@ -428,7 +418,7 @@ void config_overlay_named(gptokeyb_config *current, const char *name)
 
         if (current->button[btn].action >= ACT_STATE_HOLD)
         {
-            strncpy(current->button[btn].cfg_name, other->button[btn].cfg_name, MAX_CONTROL_NAME-1);
+            current->button[btn].cfg_name = other->button[btn].cfg_name;
             current->map_check = true;
         }
     }
@@ -480,22 +470,17 @@ gptokeyb_config *config_create(const char *name)
     if (result != NULL)
         return result;
 
-    result = (gptokeyb_config*)malloc(sizeof(gptokeyb_config));
-    if (result == NULL)
-    {
-        fprintf(stderr, "Unable to allocate memory. :(");
-        exit(255);
-    }
-
-    memset((void*)result, '\0', sizeof(gptokeyb_config));
+    result = (gptokeyb_config*)gptk_malloc(sizeof(gptokeyb_config));
 
     if (!strcasestartswith(name, "controls:"))
     {
-        snprintf(result->name, MAX_CONTROL_NAME-1, "controls:%s", name);
+        char nice_name[MAX_CONTROL_NAME];
+        snprintf(nice_name, MAX_CONTROL_NAME-1, "controls:%s", name);
+        result->name = string_register(nice_name);
     }
     else
     {
-        strncpy(result->name, name, MAX_CONTROL_NAME-1);
+        result->name = string_register(name);
     }
 
     // add it to the linked list.
@@ -569,7 +554,6 @@ void set_cfg_config(const char *name, const char *value)
     else if (strcasecmp(name, "controls") == 0)
         strncpy(default_control_name, value, MAX_CONTROL_NAME);
 
-    
     else
         fprintf(stderr, "Unknown config: %s = %s\n", name, value);
 }
@@ -596,60 +580,25 @@ void set_btn_config(gptokeyb_config *config, int btn, const char *name, const ch
      *   a = add_alt
      */
 
-    char temp_buffer[MAX_TEMP_SIZE];
-    int value_len = strlen(value);
-    char *token;
+    char *temp_buffer = tabulate_text(value);
 
-    if (value_len == 0)
+    if (temp_buffer == NULL)
         return;
 
-    if (value_len > (MAX_TEMP_SIZE-1))
-        value_len = MAX_TEMP_SIZE-1;
-
-    int t=0;
-    int i=0;
-
-    // we parse the config line, we want to break it up into tab separated items.
-    while (i < value_len)
-    {
-        if (value[i] == '"' || value[i] == '\'')
-        {
-            char c = value[i];
-            i += 1;
-
-            while (value[i] != c && i < value_len)
-                temp_buffer[t++] = value[i++];
-
-            temp_buffer[t++] = '\t';
-            i++;
-        }
-        else if (value[i] == ' ' || value[i] == '\t')
-        {
-            if (t > 0 && temp_buffer[t-1] != '\t')
-                temp_buffer[t++] = '\t';
-            i++;
-
-            while ((value[i] == ' ' || value[i] == '\t') && i < value_len)
-                i++;
-        }
-        else
-        {
-            temp_buffer[t++] = value[i++];
-
-            while (value[i] != ' ' && value[i] != '\t' && i < value_len)
-                temp_buffer[t++] = value[i++];
-        }
-    }
-    temp_buffer[t] = '\0';
-
-    // GPTK2_DEBUG(">>> '%s'\n", value);
-    // GPTK2_DEBUG("    '%s'\n", temp_buffer);
+    token_ctx *token_state = tokens_create(temp_buffer, '\t');
+    free(temp_buffer);
 
     bool first_run = true;
-    token = strtok(temp_buffer, "\t");
 
+    const char *token = tokens_next(token_state);
     while (token != NULL)
     {
+        if (strlen(token) == 0)
+        {
+            token = tokens_next(token_state);
+            continue;
+        }
+
         if (strcasecmp(token, "mouse_slow") == 0)
         {
             // Can't set mouse_slow to the special buttons
@@ -667,17 +616,20 @@ void set_btn_config(gptokeyb_config *config, int btn, const char *name, const ch
             if (btn >= GBTN_MAX)
             {
                 fprintf(stderr, "error: unable to set %s to %s\n", token, gbtn_names[btn]);
+                tokens_free(token_state);
                 return;
             }
 
-            token = strtok(NULL, "\t");
-
+            token = tokens_next(token_state);
             if (token == NULL)
+            {
+                tokens_free(token_state);
                 return;
+            }
 
             set_btn_as_mouse(btn, config, MOUSE_MOVEMENT_OFF);
             config->button[btn].action = ACT_STATE_HOLD;
-            strncpy(config->button[btn].cfg_name, token, MAX_CONTROL_NAME);
+            config->button[btn].cfg_name = string_register(token);
             config->map_check = true;
         }
         else if (strcasecmp(token, "push_state") == 0)
@@ -688,31 +640,37 @@ void set_btn_config(gptokeyb_config *config, int btn, const char *name, const ch
                 return;
             }
 
-            token = strtok(NULL, "\t");
-
+            token = tokens_next(token_state);
             if (token == NULL)
-                return;
-
-            set_btn_as_mouse(btn, config, MOUSE_MOVEMENT_OFF);
-            config->button[btn].action = ACT_STATE_PUSH;
-            strncpy(config->button[btn].cfg_name, token, MAX_CONTROL_NAME);
-            config->map_check = true;
-        }
-        else if (strcasecmp(token, "set_state") == 0)
-        {
-            token = strtok(NULL, "\t");
-            if (token == NULL)
-                continue;
-
-            if (btn >= GBTN_MAX)
             {
-                fprintf(stderr, "error: unable to set %s to %s\n", token, gbtn_names[btn]);
+                tokens_free(token_state);
                 return;
             }
 
             set_btn_as_mouse(btn, config, MOUSE_MOVEMENT_OFF);
             config->button[btn].action = ACT_STATE_PUSH;
-            strncpy(config->button[btn].cfg_name, token, MAX_CONTROL_NAME);
+            config->button[btn].cfg_name = string_register(token);
+            config->map_check = true;
+        }
+        else if (strcasecmp(token, "set_state") == 0)
+        {
+            token = tokens_next(token_state);
+            if (token == NULL)
+            {
+                tokens_free(token_state);
+                continue;
+            }
+
+            if (btn >= GBTN_MAX)
+            {
+                fprintf(stderr, "error: unable to set %s to %s\n", token, gbtn_names[btn]);
+                tokens_free(token_state);
+                return;
+            }
+
+            set_btn_as_mouse(btn, config, MOUSE_MOVEMENT_OFF);
+            config->button[btn].action = ACT_STATE_PUSH;
+            config->button[btn].cfg_name = string_register(token);
             config->map_check = true;
         }
         else if (strcasecmp(token, "pop_state") == 0)
@@ -720,6 +678,7 @@ void set_btn_config(gptokeyb_config *config, int btn, const char *name, const ch
             if (btn >= GBTN_MAX)
             {
                 fprintf(stderr, "error: unable to set %s to %s\n", token, gbtn_names[btn]);
+                tokens_free(token_state);
                 return;
             }
 
@@ -853,6 +812,7 @@ void set_btn_config(gptokeyb_config *config, int btn, const char *name, const ch
                 else
                 {
                     fprintf(stderr, "error: unable to set %s to %s\n", token, gbtn_names[btn]);
+                    tokens_free(token_state);
                     return;
                 }
             }
@@ -877,11 +837,11 @@ void set_btn_config(gptokeyb_config *config, int btn, const char *name, const ch
             }
             else
             {
-                GPTK2_DEBUG("unknown key %s\n", token);
+                GPTK2_DEBUG("# unknown key %s, %s = %s\n", token, name, value);
             }
         }
 
-        token = strtok(NULL, "\t");
+        token = tokens_next(token_state);
         first_run = false;
     }
 }
@@ -907,12 +867,16 @@ static int config_ini_handler(
             // GPTK2_DEBUG("CONTROLS\n");
             config->state = CFG_CONTROL;
             config->current_config = root_config;
+
+            gptk_hk_can_fix = false;
         }
         else if (strcasestartswith(section, "controls:"))
         {
             // GPTK2_DEBUG("CONTROLS++\n");
             config->state = CFG_CONTROL;
             config->current_config = config_create(section);
+
+            gptk_hk_can_fix = false;
         }
         else
         {
@@ -976,18 +940,11 @@ static int config_ini_handler(
         }
         else if (strcaseendswith(name, "_hk"))
         {
-            char *temp = (char*)malloc(MAX_DUMP_EXTRA_TEXT_LINE);
-            if (temp == NULL)
-            {
-                fprintf(stderr, "Unable to allocate memory. :(");
-                exit(255);
-            }
+            char *temp = (char*)gptk_malloc(GPTK_HK_FIX_MAX_LINE);
 
-            memset((char*)temp, '\0', MAX_DUMP_EXTRA_TEXT_LINE);
+            snprintf(temp, GPTK_HK_FIX_MAX_LINE, "%s=%s", name, value);
 
-            snprintf(temp, MAX_DUMP_EXTRA_TEXT_LINE, "%s = %s", name, value);
-
-            extra_dump_text[extra_dump_offset++] = temp;
+            gptk_hk_fix_text[gptk_hk_fix_offset++] = temp;
         }
         else
         {
@@ -1072,15 +1029,56 @@ int config_load(const char *file_name, bool config_only)
 
 void config_finalise()
 {   // this will check all the configs loaded and link the cfg_name to cfg_maps
-    gptokeyb_config *current=root_config;
+    gptokeyb_config *current = root_config;
     gptokeyb_config *other;
+
+    if (gptk_hk_can_fix && gptk_hk_fix_offset > 0)
+    {   // if it has only seen a gptk file we can convert <key>_hk automatically.
+        set_btn_config(current, current_state.hotkey_gbtn, "hotkey", "hold_state hotkey");
+
+        current = config_create("controls:hotkey");
+
+        config_overlay_parent(current);
+
+        for (int i=0; i < gptk_hk_fix_offset; i++)
+        {
+            char *name = gptk_hk_fix_text[i];
+            char *value = strchr(gptk_hk_fix_text[i], '=');
+            value++;
+
+            // printf("REGESTERING: '%s' = '%s'", name, value);
+
+            if (value == NULL || strlen(value) == 0)
+            {
+                // printf(": bad value\n");
+                continue;
+            }
+
+            *(value - 4) = '\0';
+
+            // printf(", '%s'", name);
+
+            const button_match *button = find_button(name);
+
+            if (!button)
+            {
+                // printf(": bad button\n");
+                continue;
+            }
+
+            int btn = button->gbtn;
+
+            set_btn_config(current, btn, name, value);
+            // printf("\n");
+        }
+
+        current = root_config;
+    }
+
 
     while (current != NULL)
     {
         // GPTK2_DEBUG("Checking %s\n", current->name);
-
-        // figured out a better way of handling mouse_slow.
-        // int seen_mouse_slow = -1;
 
         if (current->map_check)
         {

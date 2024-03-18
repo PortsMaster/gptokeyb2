@@ -189,13 +189,15 @@ void handleEventAxisFakeKeyboardMouseDevice(const SDL_Event *event)
     }
     else
     {
-        if (left_axis_movement) {
+        if (left_axis_movement)
+        {
             update_button(GBTN_LEFT_ANALOG_UP,    _ANALOG_AXIS_NEG(current_state.current_left_analog_y, current_state.deadzone_y));
             update_button(GBTN_LEFT_ANALOG_DOWN,  _ANALOG_AXIS_POS(current_state.current_left_analog_y, current_state.deadzone_y));
             update_button(GBTN_LEFT_ANALOG_LEFT,  _ANALOG_AXIS_NEG(current_state.current_left_analog_x, current_state.deadzone_x));
             update_button(GBTN_LEFT_ANALOG_RIGHT, _ANALOG_AXIS_POS(current_state.current_left_analog_x, current_state.deadzone_x));
         }
-        if (right_axis_movement) {
+        if (right_axis_movement)
+        {
             update_button(GBTN_RIGHT_ANALOG_UP,    _ANALOG_AXIS_NEG(current_state.current_right_analog_y, current_state.deadzone_y));
             update_button(GBTN_RIGHT_ANALOG_DOWN,  _ANALOG_AXIS_POS(current_state.current_right_analog_y, current_state.deadzone_y));
             update_button(GBTN_RIGHT_ANALOG_LEFT,  _ANALOG_AXIS_NEG(current_state.current_right_analog_x, current_state.deadzone_x));

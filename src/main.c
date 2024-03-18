@@ -66,8 +66,10 @@ int main(int argc, char* argv[])
 {
     bool do_dump_config = false;
 
+    string_init();
     state_init();
     config_init();
+    input_init();
 
     char* env_home = SDL_getenv("HOME");
     if (env_home)
@@ -112,13 +114,18 @@ int main(int argc, char* argv[])
     int opt;
     char default_control[MAX_CONTROL_NAME] = "";
 
-    while ((opt = getopt(argc, argv, "k1g:hdxp:c:ZXPH:s:")) != -1)
+    while ((opt = getopt(argc, argv, "vk1g:hdxp:c:ZXPH:s:")) != -1)
     {
         switch (opt)
         {
         case 'k':
         case '1':
             // do nothing.
+            break;
+
+        case 'v':
+            printf("gptokeyb2 %s\n", GPTK2_VERSION);
+            return 0;
             break;
 
         case 's':
@@ -218,11 +225,13 @@ int main(int argc, char* argv[])
             fprintf(stderr, "  -p  \"control\"       - what control mode to start in.\n");
             fprintf(stderr, "\n");
             fprintf(stderr, "  -d                  - dump config parsed.\n");
+            fprintf(stderr, "  -v                  - print version and quit.");
             fprintf(stderr, "\n");
             break;
 
         default:
             config_quit();
+            string_quit();
             exit(EXIT_FAILURE);
             break;
         }
@@ -272,6 +281,7 @@ int main(int argc, char* argv[])
             if (config_load(user_config_file, true))
             {
                 config_quit();
+                string_quit();
                 return 1;
             }
         }
@@ -310,6 +320,7 @@ int main(int argc, char* argv[])
     if (do_dump_config)
     {
         config_dump();
+        string_quit();
         return 0;
     }
 
@@ -389,16 +400,6 @@ int main(int argc, char* argv[])
 
         if (current_state.mouse_x != 0 || current_state.mouse_y != 0 || current_dpad_as_mouse || current_state.in_repeat)
         {
-            if (current_state.in_repeat)
-            {            
-                // printf("%5dx%5d, %5dx%5d %08x\n",
-                //     current_state.current_left_analog_x,
-                //     current_state.current_left_analog_y,
-                //     current_state.current_right_analog_x,
-                //     current_state.current_right_analog_y,
-                //     current_state.in_repeat);
-            }
-
             mouse_x = current_state.mouse_x;
             mouse_y = current_state.mouse_y;
 
@@ -456,6 +457,11 @@ int main(int argc, char* argv[])
     /* Clean up */
     ioctl(uinp_fd, UI_DEV_DESTROY);
     close(uinp_fd);
+
+    config_quit();
+    // state_quit();
+    // input_quit();
+    string_quit();
 
     return 0;
 }

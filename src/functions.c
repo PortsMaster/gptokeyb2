@@ -45,74 +45,15 @@ struct _fn_data_store
     void *data;
 };
 
-typedef struct _function_map
-{
-    struct _function_map *next;
-    const char *name;
-    int fn_id;
-
-    fn_assign   *assign_func;
-    fn_validate *validate_func;
-    fn_config   *config_func;
-    fn_button   *button_func;
-    fn_tick     *tick_func;
-} function_map;
 
 static int global_function_id = 0;
-function_map *function_map_root = NULL;
 
 void functions_init()
 {
-    function_map_root = NULL;
 }
 
 void functions_quit()
 {
-    ;
-}
-
-int function_register(
-    const char  *name,
-    fn_assign   *assign_func,
-    fn_validate *validate_func,
-    fn_config   *config_func,
-    fn_button   *button_func,
-    fn_tick     *tick_func)
-{
-    function_map *current = function_map_root;
-    function_map *last = NULL;
-
-    while (current != NULL)
-    {
-        last = current;
-
-        if (strcmp(current->name, name) == 0)
-        {
-            fprintf(stderr, "WTF MATE: %s is already registered as %d\n", name, current->fn_id);
-            return current->fn_id;
-        }
-
-        current = current->next;
-    }
-
-    function_map *new_map = (function_map*)gptk_malloc(sizeof(function_map));
-
-    new_map->fn_id = ++global_function_id;
-    new_map->name = string_register(name);
-
-    if (last == NULL)
-        function_map_root = new_map;
-
-    else
-        last->next = new_map;
-
-    new_map->assign_func   = assign_func;
-    new_map->validate_func = validate_func;
-    new_map->config_func   = config_func;
-    new_map->button_func   = button_func;
-    new_map->tick_func     = tick_func;
-
-    return new_map->fn_id;
 }
 
 
@@ -192,4 +133,20 @@ void function_state_clear_all(fn_data_store **store)
     }
 
     *store = NULL;
+}
+
+
+void  function_global_configure(const char *name, const char *value)
+{
+    GPTK2_DEBUG("FUNC: global %s -> %s\n", name, value);
+}
+
+void  function_config_configure(gptokeyb_config *config, const char *name, const char *value)
+{
+    GPTK2_DEBUG("FUNC: config[%s] %s -> %s\n", config->name, name, value);
+}
+
+void  function_button_configure(gptokeyb_config *config, int btn, const char *name, const char *value, const char *more)
+{
+    GPTK2_DEBUG("FUNC: config[%s][%s] %s -> %s\n", config->name, gbtn_names[btn], name, value);
 }

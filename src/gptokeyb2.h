@@ -310,13 +310,14 @@ typedef struct
     float y;
 } vector2d;
 
-
 // function functions
-typedef bool (*fn_assign  )(gptokeyb_config *config, int btn);
-typedef void (*fn_validate)(gptokeyb_config *config);
-typedef void (*fn_config   )(gptokeyb_config *config, int mode);
-typedef void (*fn_button  )(gptokeyb_config *config, int btn, bool pressed);
-typedef void (*fn_tick    )(gptokeyb_config *config);
+typedef bool (*fn_global_reg)(const char *name, const char *value);
+typedef bool (*fn_config_reg)(gptokeyb_config *config, const char *name, const char *value);
+typedef bool (*fn_button_reg)(gptokeyb_config *config, int btn, const char *name, const char *value);
+typedef void (*fn_validate  )(gptokeyb_config *config);
+typedef void (*fn_config    )(gptokeyb_config *config, int mode);
+typedef void (*fn_button    )(gptokeyb_config *config, int btn, bool pressed);
+typedef void (*fn_tick      )(gptokeyb_config *config);
 
 
 // some stuff
@@ -393,8 +394,11 @@ void  function_state_clear_all(fn_data_store **store);
 
 void functions_init();
 void functions_quit();
-int function_register(const char *name, fn_assign *assign_func, fn_validate *validate_func, fn_config *layer_func, fn_button *key_func, fn_tick *tick_func);
 bool function_config(gptokeyb_config *config, const char *name);
+
+void  function_global_configure(const char *name, const char *value);
+void  function_config_configure(gptokeyb_config *config, const char *name, const char *value);
+void  function_button_configure(gptokeyb_config *config, int btn, const char *name, const char *value, const char *more);
 
 // util.c -- CHATGPT
 void *gptk_malloc(size_t);

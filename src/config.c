@@ -555,7 +555,7 @@ void set_cfg_config(const char *name, const char *value)
         strncpy(default_control_name, value, MAX_CONTROL_NAME);
 
     else
-        fprintf(stderr, "Unknown config: %s = %s\n", name, value);
+        function_global_configure(name, value);
 }
 
 static inline void set_btn_as_mouse(int btn, gptokeyb_config *config, int mode)
@@ -837,6 +837,7 @@ void set_btn_config(gptokeyb_config *config, int btn, const char *name, const ch
             }
             else
             {
+                function_button_configure(config, btn, name, token, tokens_rest(token_state));
                 GPTK2_DEBUG("# unknown key %s, %s = %s\n", token, name, value);
             }
         }
@@ -993,6 +994,7 @@ static int config_ini_handler(
         else
         {
             GPTK2_DEBUG("X: %s: %s\n", name, value);
+            function_config_configure(config->current_config, name, value);
         }
     }
     else

@@ -4,6 +4,7 @@ start = p                   # Pause
 a = mouse_left
 b = mouse_right
 x = q                       # Clone building under mouse cursor
+y = \"
 
 l1_hk = u                   # Decrease game speed
 l2 = end                    # Rotate counter clock wise

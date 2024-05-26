@@ -231,6 +231,7 @@ int main(int argc, char* argv[])
 
         default:
             config_quit();
+            input_quit();
             string_quit();
             exit(EXIT_FAILURE);
             break;
@@ -281,6 +282,7 @@ int main(int argc, char* argv[])
             if (config_load(user_config_file, true))
             {
                 config_quit();
+                input_quit();
                 string_quit();
                 return 1;
             }
@@ -320,6 +322,8 @@ int main(int argc, char* argv[])
     if (do_dump_config)
     {
         config_dump();
+        config_quit();
+        input_quit();
         string_quit();
         return 0;
     }
@@ -460,7 +464,7 @@ int main(int argc, char* argv[])
 
     config_quit();
     // state_quit();
-    // input_quit();
+    input_quit();
     string_quit();
 
     return 0;

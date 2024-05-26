@@ -57,7 +57,26 @@ void *gptk_malloc(size_t size)
         exit(255);
     }
 
-    memset(data, '\0', size);
+    memset(data, 0, size);
+    return data;
+}
+
+
+void *gptk_realloc(void *old_data, size_t old_size, size_t size)
+{
+    void *data = realloc(old_data, size);
+
+    if (data == NULL)
+    {
+        fprintf(stderr, "Unable to reallocate memory. :(\n");
+        exit(255);
+    }
+
+    if (size > old_size)
+    {
+        memset((char *)data + old_size, 0, size - old_size);
+    }
+
     return data;
 }
 
@@ -382,6 +401,17 @@ void emitMouseMotion(int x, int y)
         emit(EV_SYN, SYN_REPORT, 0);
     }
 }
+
+
+void emitMouseWheel(int wheel)
+{
+    if (wheel != 0)
+    {
+        emit(EV_REL, REL_WHEEL, wheel);
+        emit(EV_SYN, SYN_REPORT, 0);
+    }
+}
+
 
 void handleAnalogTrigger(bool is_triggered, bool *was_triggered, int key, int modifier)
 {

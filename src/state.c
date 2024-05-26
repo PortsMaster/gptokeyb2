@@ -52,12 +52,12 @@ void state_init()
     current_state.running = true;
 
     current_state.repeat_delay = SDL_DEFAULT_REPEAT_DELAY;
-    current_state.repeat_rate = SDL_DEFAULT_REPEAT_INTERVAL;
+    current_state.repeat_rate  = SDL_DEFAULT_REPEAT_INTERVAL;
 
-    current_state.dpad_mouse_step = 5;
+    current_state.dpad_mouse_step  = 5;
     current_state.mouse_slow_scale = 50;
 
-    current_state.deadzone_mode = DZ_DEFAULT;
+    current_state.deadzone_mode  = DZ_DEFAULT;
     current_state.deadzone_scale = 512;
 
     current_state.deadzone_x = 1000;
@@ -384,17 +384,21 @@ void update_button(int btn, bool pressed)
 
     if (was_pressed(btn))
     {
-        button = state_button(btn);
-
-        if (button == NULL)
-            return;
-
         // GPTK2_DEBUG("%s -> %s\n", gbtn_names[btn], (pressed ? "pressed" : "released"));
 
         if ((current_state.in_repeat & btn_mask) == 0)
         {
             current_state.held_since[btn] = current_ticks;
+            button = current_state.button_held[btn];
         }
+        else
+        {
+            button = state_button(btn);
+            current_state.button_held[btn] = button;
+        }
+
+        if (button == NULL)
+            return;
 
         if (button->action == ACT_STATE_POP)
         {
@@ -416,10 +420,60 @@ void update_button(int btn, bool pressed)
             {
                 push_state(button->cfg_map);
             }
+
+            if (button->keycode != 0)
+            {
+                GPTK2_DEBUG("PRESSED '%s' -> '%s'\n", gbtn_names[btn], find_keycode(button->keycode));
+                emitKey(button->keycode, true, button->modifier);                
+            }
         }
-        else if (button->action == ACT_MOUSE_SLOW)
+        else if (button->action == ACT_SPECIAL && button->special == SPC_MOUSE_SLOW)
         {   // this way we can always clear the mouse_slow flag if the state changes.
             current_state.mouse_slow |= btn_mask;
+        }
+        else if (button->action == ACT_SPECIAL && button->special >= SPC_ADD_LETTER)
+        {   // this way we can always clear the mouse_slow flag if the state changes.
+            switch (button->special)
+            {
+            case SPC_ADD_LETTER:
+                input_add_letter();
+                break;
+
+            case SPC_REM_LETTER:
+                input_rem_letter();
+                break;
+
+            case SPC_NEXT_LETTER:
+                input_next_letter(1);
+                break;
+
+            case SPC_PREV_LETTER:
+                input_prev_letter(1);
+                break;
+
+            case SPC_NEXT_WORD:
+                input_next_word(1);
+                break;
+
+            case SPC_PREV_WORD:
+                input_prev_word(1);
+                break;
+
+            case SPC_ACCEPT_INPUT:
+                emitTextInputKey(KEY_ENTER, false);
+                pop_state(button->cfg_map);
+                set_input_state("", 0);
+                break;
+
+            case SPC_CANCEL_INPUT:
+                clear_input_state();
+                emitTextInputKey(KEY_ENTER, false);
+                pop_state(button->cfg_map);
+                break;
+
+            default:
+                break;
+            }
         }
         else if (GBTN_IS_DPAD(btn) && current_dpad_as_mouse)
         {   // this way we can always clear the mouse_move flag if the state changes.
@@ -430,6 +484,7 @@ void update_button(int btn, bool pressed)
             current_state.in_repeat |= btn_mask;
             current_state.next_repeat[btn] = (current_ticks + current_state.repeat_delay);
         }
+
         if (button->keycode != 0)
         {
             GPTK2_DEBUG("PRESSED '%s' -> '%s'\n", gbtn_names[btn], find_keycode(button->keycode));
@@ -438,7 +493,8 @@ void update_button(int btn, bool pressed)
     }
     else if (was_released(btn))
     {
-        button = state_button(btn);
+        button = current_state.button_held[btn];
+        current_state.button_held[btn] = NULL;
 
         if (button == NULL)
             return;

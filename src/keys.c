@@ -248,23 +248,23 @@ const button_match button_codes[] = {
     {"select", GBTN_BACK},
     {"guide",  GBTN_GUIDE},
 
-    {"up", GBTN_DPAD_UP},
-    {"down", GBTN_DPAD_DOWN},
-    {"left", GBTN_DPAD_LEFT},
+    {"up",    GBTN_DPAD_UP},
+    {"down",  GBTN_DPAD_DOWN},
+    {"left",  GBTN_DPAD_LEFT},
     {"right", GBTN_DPAD_RIGHT},
 
-    {"left_analog_up", GBTN_LEFT_ANALOG_UP},
-    {"left_analog_down", GBTN_LEFT_ANALOG_DOWN},
-    {"left_analog_left", GBTN_LEFT_ANALOG_LEFT},
+    {"left_analog_up",    GBTN_LEFT_ANALOG_UP},
+    {"left_analog_down",  GBTN_LEFT_ANALOG_DOWN},
+    {"left_analog_left",  GBTN_LEFT_ANALOG_LEFT},
     {"left_analog_right", GBTN_LEFT_ANALOG_RIGHT},
 
-    {"right_analog_up", GBTN_RIGHT_ANALOG_UP},
-    {"right_analog_down", GBTN_RIGHT_ANALOG_DOWN},
-    {"right_analog_left", GBTN_RIGHT_ANALOG_LEFT},
+    {"right_analog_up",    GBTN_RIGHT_ANALOG_UP},
+    {"right_analog_down",  GBTN_RIGHT_ANALOG_DOWN},
+    {"right_analog_left",  GBTN_RIGHT_ANALOG_LEFT},
     {"right_analog_right", GBTN_RIGHT_ANALOG_RIGHT},
 
-    {"dpad", GBTN_DPAD},
-    {"left_analog", GBTN_LEFT_ANALOG},
+    {"dpad",         GBTN_DPAD},
+    {"left_analog",  GBTN_LEFT_ANALOG},
     {"right_analog", GBTN_RIGHT_ANALOG},
 };
 

@@ -59,6 +59,8 @@ void setupFakeKeyboardMouseDevice(struct uinput_user_dev *device, int fd)
     ioctl(fd, UI_SET_RELBIT, REL_Y);
     ioctl(fd, UI_SET_KEYBIT, BTN_LEFT);
     ioctl(fd, UI_SET_KEYBIT, BTN_RIGHT);
+    // FUCKING SCHROLL WHEEL
+    ioctl(fd, UI_SET_RELBIT, REL_WHEEL);
 }
 
 

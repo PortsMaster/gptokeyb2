@@ -33,7 +33,6 @@ add_executable(gptokeyb2
     src/analog.c
     src/config.c
     src/event.c
-    src/functions.c
     src/ini.c
     src/input.c
     src/keyboard.c

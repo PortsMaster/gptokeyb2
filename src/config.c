@@ -18,21 +18,21 @@
 * Authored by: Kris Henriksen <krishenriksen.work@gmail.com>
 #
 * AnberPorts-Keyboard-Mouse
-* 
+*
 * Part of the code is from from https://github.com/krishenriksen/AnberPorts/blob/master/AnberPorts-Keyboard-Mouse/main.c (mostly the fake keyboard)
 * Fake Xbox code from: https://github.com/Emanem/js2xbox
-* 
+*
 * Modified (badly) by: Shanti Gilbert for EmuELEC
 * Modified further by: Nikolai Wuttke for EmuELEC (Added support for SDL and the SDLGameControllerdb.txt)
 * Modified further by: Jacob Smith
-* 
-* Any help improving this code would be greatly appreciated! 
-* 
+*
+* Any help improving this code would be greatly appreciated!
+*
 * DONE: Xbox360 mode: Fix triggers so that they report from 0 to 255 like real Xbox triggers
 *       Xbox360 mode: Figure out why the axis are not correctly labeled?  SDL_CONTROLLER_AXIS_RIGHTX / SDL_CONTROLLER_AXIS_RIGHTY / SDL_CONTROLLER_AXIS_TRIGGERLEFT / SDL_CONTROLLER_AXIS_TRIGGERRIGHT
 *       Keyboard mode: Add a config file option to load mappings from.
 *       add L2/R2 triggers
-* 
+*
 */
 
 #include "gptokeyb2.h"
@@ -47,6 +47,7 @@ enum
     CFG_CONFIG,
     CFG_CONTROL,
     CFG_OTHER,
+    CFG_IGNORE,
 };
 
 
@@ -142,6 +143,11 @@ const char *spc_names[] = {
     "cancel_text",
 };
 
+const char *ovl_names[] = {
+    "(none)",
+    "parent",
+    "clear",
+};
 
 int atoi_between(const char *value, int minimum, int maximum, int default_value)
 {
@@ -271,14 +277,15 @@ void config_quit()
 void config_dump()
 {   // Dump all the current configs.
     gptokeyb_config *current = root_config;
+    bool need_newline = false;
 
-    printf("###########################################\n");
-    printf("# CONFIG DUMP\n");
-    printf("\n");
+    // printf("###########################################\n");
+    // printf("# CONFIG DUMP\n");
+    // printf("\n");
 
     printf("[config]\n");
-    printf("repeat_delay = %d\n", current_state.repeat_delay);
-    printf("repeat_rate = %d\n", current_state.repeat_rate);
+    printf("repeat_delay = %ld\n", current_state.repeat_delay);
+    printf("repeat_rate = %ld\n", current_state.repeat_rate);
     printf("mouse_slow_scale = %d\n", current_state.mouse_slow_scale);
     printf("deadzone_mode = %s\n", deadzone_mode_str(current_state.deadzone_mode));
     printf("deadzone_scale = %d\n", current_state.deadzone_scale);
@@ -297,7 +304,25 @@ void config_dump()
 
     while (current != NULL)
     {
-        printf("[%s]\n", current->name);
+        printf("[%s]\n\n", current->name);
+
+        if (current->overlay_mode != OVL_NONE)
+        {
+            printf("overlay = \"%s\"\n", ovl_names[current->overlay_mode]);
+            need_newline = true;
+        }
+
+        if (current->charset != NULL)
+        {
+            printf("charset = \"%s\"\n", current->charset);
+            need_newline = true;
+        }
+
+        if (current->wordset != NULL)
+        {
+            printf("wordset = \"%s\"\n", current->wordset);
+            need_newline = true;
+        }
 
         for (int btn=0; btn < GBTN_MAX; btn++)
         {
@@ -324,10 +349,44 @@ void config_dump()
                     gbnt_mode = ((current->right_analog_as_mouse == MOUSE_MOVEMENT_ON) ? "mouse_movement" : "parent");
                 }
 
+                if (strcmp(gbnt_mode, "parent") == 0 && current->overlay_mode == OVL_PARENT)
+                {
+                    btn += 3;
+                    continue;
+                }
+
+                if (need_newline)
+                {
+                    printf("\n");
+                    need_newline = false;
+                }
+
                 printf("%s = %s\n", gbnt_name, gbnt_mode);
-                printf("\n");
+                need_newline = true;
                 btn += 3;
                 continue;
+            }
+
+            if (current->overlay_mode == OVL_CLEAR && current->button[btn].keycode == 0 && current->button[btn].action == 0)
+            {
+                if ((btn == GBTN_Y) || (btn == GBTN_R3) || (btn == GBTN_GUIDE) || (btn == GBTN_DPAD_RIGHT) || (btn == GBTN_LEFT_ANALOG_RIGHT))
+                    need_newline = true;
+
+                continue;
+            }
+
+            if (current->overlay_mode == OVL_PARENT && current->button[btn].action == ACT_PARENT)
+            {
+                if ((btn == GBTN_Y) || (btn == GBTN_R3) || (btn == GBTN_GUIDE) || (btn == GBTN_DPAD_RIGHT) || (btn == GBTN_LEFT_ANALOG_RIGHT))
+                    need_newline = true;
+
+                continue;
+            }
+
+            if (need_newline)
+            {
+                printf("\n");
+                need_newline = false;
             }
 
             printf("%s =", gbtn_names[btn]);
@@ -368,19 +427,20 @@ void config_dump()
             printf("\n");
 
             if ((btn == GBTN_Y) || (btn == GBTN_R3) || (btn == GBTN_GUIDE) || (btn == GBTN_DPAD_RIGHT) || (btn == GBTN_LEFT_ANALOG_RIGHT))
-                printf("\n");
+                need_newline = true;
         }
 
         current = current->next;
         printf("\n");
     }
 
-    printf("###########################################\n");
+    // printf("###########################################\n");
 }
 
 
 void config_overlay_clear(gptokeyb_config *current)
 {
+    current->overlay_mode = OVL_CLEAR;
     current->dpad_as_mouse = MOUSE_MOVEMENT_OFF;
     current->left_analog_as_mouse = MOUSE_MOVEMENT_OFF;
     current->right_analog_as_mouse = MOUSE_MOVEMENT_OFF;
@@ -397,6 +457,7 @@ void config_overlay_clear(gptokeyb_config *current)
 
 void config_overlay_parent(gptokeyb_config *current)
 {
+    current->overlay_mode = OVL_PARENT;
     current->dpad_as_mouse = MOUSE_MOVEMENT_PARENT;
     current->left_analog_as_mouse = MOUSE_MOVEMENT_PARENT;
     current->right_analog_as_mouse = MOUSE_MOVEMENT_PARENT;
@@ -426,6 +487,8 @@ void config_overlay_named(gptokeyb_config *current, const char *name)
         fprintf(stderr, "overlay %s: unable to overlay to the same config\n", name);
         return;
     }
+
+    current->overlay_mode = OVL_NONE;
 
     // fprintf(stderr, "overlay %s: \n", other->name);
     current->dpad_as_mouse         = other->dpad_as_mouse;
@@ -517,23 +580,9 @@ gptokeyb_config *config_create(const char *name)
     return result;
 }
 
-void set_cfg_config(const char *name, const char *value)
+void set_cfg_config(const char *name, const char *value, token_ctx *token_state)
 {
-    bool is_game_config = false;
-
-    if (strlen(game_prefix) > 0)
-    {
-        if (strcasestartswith(name, game_prefix))
-        {
-            name += strlen(game_prefix);
-            is_game_config = true;
-
-            if (name[0] == '_')
-                name += 1;
-
-            printf("GAME OVERRIDE: %s: %s = %s\n", game_prefix, name, value);
-        }
-    }
+    // printf("%s -> %s\n", name, value);
 
     if (strcasecmp(name, "repeat_delay") == 0)
         current_state.repeat_delay = atoi_between(value, 16, 3000, SDL_DEFAULT_REPEAT_DELAY);
@@ -579,103 +628,72 @@ void set_cfg_config(const char *name, const char *value)
 
     else if (strcasecmp(name, "charset") == 0)
     {
-        char *temp_buffer = tabulate_text(value);
+        while (value != NULL && strlen(value) == 0)
+            value = tokens_next(token_state);
 
-        if (temp_buffer == NULL)
-        {
-            fprintf(stderr, "charset used without any name or characters defined.\n");
-            return;
-        }
-
-        token_ctx *token_state = tokens_create(temp_buffer, '\t');
-        free(temp_buffer);
-
-        const char *token = tokens_next(token_state);
-
-        while (token != NULL && strlen(token) == 0)
-            token = tokens_next(token_state);
-
-        if (token == NULL)
+        if (value == NULL)
         {
             fprintf(stderr, "charset used without any name or characters defined.\n");
             tokens_free(token_state);
             return;
         }
 
-        char *chars_name = strdup(token);
+        char *chars_name = strdup(value);
 
-        token = tokens_next(token_state);
+        value = tokens_next(token_state);
 
-        while (token != NULL && strlen(token) == 0)
-            token = tokens_next(token_state);
+        while (value != NULL && strlen(value) == 0)
+            value = tokens_next(token_state);
 
-        if (token == NULL)
+        if (value == NULL)
         {
             fprintf(stderr, "charset \"%s\" specified without any characters defined.\n", chars_name);
             free(chars_name);
-            tokens_free(token_state);
             return;
         }
 
-        register_char_set(chars_name, token);
+        register_char_set(chars_name, value);
 
         free(chars_name);
-        tokens_free(token_state);
         return;
     }
     else if (strcasecmp(name, "wordset") == 0)
     {
-        char *temp_buffer = tabulate_text(value);
+        while (value != NULL && strlen(value) == 0)
+            value = tokens_next(token_state);
 
-        if (temp_buffer == NULL)
+        if (value == NULL)
         {
             fprintf(stderr, "wordset used without any name or words defined.\n");
             return;
         }
 
-        token_ctx *token_state = tokens_create(temp_buffer, '\t');
-        free(temp_buffer);
+        char *words_name = strdup(value);
 
-        const char *token = tokens_next(token_state);
+        value = tokens_next(token_state);
 
-        while (token != NULL && strlen(token) == 0)
-            token = tokens_next(token_state);
+        while (value != NULL && strlen(value) == 0)
+            value = tokens_next(token_state);
 
-        if (token == NULL)
-        {
-            fprintf(stderr, "wordset used without any name or words defined.\n");
-            tokens_free(token_state);
-            return;
-        }
-
-        char *words_name = strdup(token);
-
-        token = tokens_next(token_state);
-
-        while (token != NULL && strlen(token) == 0)
-            token = tokens_next(token_state);
-
-        if (token == NULL)
+        if (value == NULL)
         {
             fprintf(stderr, "wordset \"%s\" specified without any words defined.\n", words_name);
             free(words_name);
-            tokens_free(token_state);
             return;
         }
 
-        while (token != NULL)
+        while (value != NULL)
         {
-            register_word_set(words_name, token);
+            register_word_set(words_name, value);
 
-            token = tokens_next(token_state);
+            value = tokens_next(token_state);
 
-            while (token != NULL && strlen(token) == 0)
-                token = tokens_next(token_state);
+            while (value != NULL && strlen(value) == 0)
+                value = tokens_next(token_state);
         }
 
         free(words_name);
-        tokens_free(token_state);
-        return;        
+        return;
     }
 #ifdef GPTK2_DEBUG_ENABLED
     else
@@ -698,28 +716,23 @@ static inline void set_btn_as_mouse(int btn, gptokeyb_config *config, int mode)
 }
 
 
-void set_btn_config(gptokeyb_config *config, int btn, const char *name, const char *value)
+void set_btn_config(gptokeyb_config *config, int btn, const char *name, const char *value, token_ctx *token_state)
 {   // this parses a keybinding
     /*
      * Keybindings can be in the form:
-     * 
+     *
      *   a = f1
      *   a = add_alt
      */
 
-    char *temp_buffer = tabulate_text(value);
-
-    if (temp_buffer == NULL)
-        return;
-
-    token_ctx *token_state = tokens_create(temp_buffer, '\t');
-    free(temp_buffer);
-
     bool first_run = true;
 
-    const char *token = tokens_next(token_state);
+    const char *token = value;
+
     while (token != NULL)
     {
+        // printf("%d -> %s -> %s -> %s\n", btn, name, value, token);
+
         if (strlen(token) == 0)
         {
             token = tokens_next(token_state);
@@ -840,14 +853,12 @@ void set_btn_config(gptokeyb_config *config, int btn, const char *name, const ch
             if (btn >= GBTN_MAX)
             {
                 fprintf(stderr, "error: unable to set %s to %s\n", token, gbtn_names[btn]);
-                tokens_free(token_state);
                 return;
             }
 
             token = tokens_next(token_state);
             if (token == NULL)
             {
-                tokens_free(token_state);
                 return;
             }
 
@@ -861,14 +872,12 @@ void set_btn_config(gptokeyb_config *config, int btn, const char *name, const ch
             if (btn >= GBTN_MAX)
             {
                 fprintf(stderr, "error: unable to set %s to %s\n", token, gbtn_names[btn]);
-                tokens_free(token_state);
                 return;
             }
 
             token = tokens_next(token_state);
             if (token == NULL)
             {
-                tokens_free(token_state);
                 return;
             }
 
@@ -882,7 +891,6 @@ void set_btn_config(gptokeyb_config *config, int btn, const char *name, const ch
             token = tokens_next(token_state);
             if (token == NULL)
             {
-                tokens_free(token_state);
                 fprintf(stderr, "set_state without a state specified on %s.\n", gbtn_names[btn]);
                 return;
             }
@@ -890,7 +898,6 @@ void set_btn_config(gptokeyb_config *config, int btn, const char *name, const ch
             if (btn >= GBTN_MAX)
             {
                 fprintf(stderr, "error: unable to set %s to %s\n", token, gbtn_names[btn]);
-                tokens_free(token_state);
                 return;
             }
 
@@ -1022,7 +1029,7 @@ void set_btn_config(gptokeyb_config *config, int btn, const char *name, const ch
                 }
                 else
                 {
-                    config->button[btn].keycode  = key->keycode;                    
+                    config->button[btn].keycode  = key->keycode;
                     config->button[btn].action   = ACT_NONE;
                     config->button[btn].special  = SPC_NONE;
                     // CEBION SAID NO
@@ -1045,7 +1052,6 @@ void set_btn_config(gptokeyb_config *config, int btn, const char *name, const ch
                 else
                 {
                     fprintf(stderr, "error: unable to set %s to %s\n", token, gbtn_names[btn]);
-                    tokens_free(token_state);
                     return;
                 }
             }
@@ -1069,9 +1075,13 @@ void set_btn_config(gptokeyb_config *config, int btn, const char *name, const ch
                     return;
                 }
             }
+            else if (strcmp(token, "\"") == 0)
+            {
+                GPTK2_DEBUG("# empty key %s, %s = %s\n", token, name, value);
+            }
             else
             {
-                GPTK2_DEBUG("# unknown key %s, %s = %s\n", token, name, value);
+                GPTK2_DEBUG("# unknown key \"%s\", %s = \"%s\"\n", token, name, value);
             }
         }
 
@@ -1086,6 +1096,16 @@ static int config_ini_handler(
 {
     config_parser* config = (config_parser*)user;
 
+    char *temp_buffer = tabulate_text(value);
+
+    if (temp_buffer == NULL)
+        return 0;
+
+    token_ctx *token_state = tokens_create(temp_buffer, '\t');
+    free(temp_buffer);
+
+    const char *token = tokens_next(token_state);
+
     if (strcmp(config->last_section, section) != 0)
     {
         // GPTK2_DEBUG("%s:\n", section);
@@ -1093,20 +1113,37 @@ static int config_ini_handler(
 
         if (strcasecmp(section, "config") == 0)
         {
-            // GPTK2_DEBUG("CONFIG\n");
+            GPTK2_DEBUG("CONFIG\n");
             config->state = CFG_CONFIG;
+        }
+        else if (strlen(game_prefix) > 0 && strcasestartswith(section, "config:") == true)
+        {
+            const char *section_gameprefix = section + 7; // strlen("config:")
+
+            GPTK2_DEBUG("CONFIG++: %s\n", section_gameprefix);
+            if (strcasecmp(section_gameprefix, game_prefix) == 0)
+            {
+                config->state = CFG_CONFIG;
+                GPTK2_DEBUG("ACCEPT GAME OVERRIDE \"%s\": %s = %s\n", section, name, value);
+            }
+            else
+            {
+                GPTK2_DEBUG("IGNORE GAME OVERRIDE \"%s\": %s = %s\n", section, name, value);
+                tokens_free(token_state);
+                return 1;
+            }
         }
         else if (strcasecmp(section, "controls") == 0)
         {
-            // GPTK2_DEBUG("CONTROLS\n");
+            GPTK2_DEBUG("CONTROLS\n");
             config->state = CFG_CONTROL;
             config->current_config = root_config;
 
             gptk_hk_can_fix = false;
         }
-        else if (strcasestartswith(section, "controls:"))
+        else if (strcasestartswith(section, "controls:") == true)
         {
-            // GPTK2_DEBUG("CONTROLS++\n");
+            GPTK2_DEBUG("CONTROLS++: %s\n", section);
             config->state = CFG_CONTROL;
             config->current_config = config_create(section);
 
@@ -1114,7 +1151,7 @@ static int config_ini_handler(
         }
         else
         {
-            // GPTK2_DEBUG("OTHER\n");
+            GPTK2_DEBUG("OTHER %s\n", section);
             config->state = CFG_OTHER;
         }
     }
@@ -1125,47 +1162,47 @@ static int config_ini_handler(
 
         if (button != NULL)
         {   // fixes things from old gptk files.
-            if (strcasestartswith(value, "mouse_movement_"))
+            if (strcasestartswith(token, "mouse_movement_"))
             {
                 if (GBTN_IS_DPAD(button->gbtn))
                 {
                     name = "dpad";
-                    value = "mouse_movement";
+                    token = "mouse_movement";
                     button = find_button(name);
                 }
                 else if (GBTN_IS_LEFT_ANALOG(button->gbtn))
                 {
                     name = "left_analog";
-                    value = "mouse_movement";
+                    token = "mouse_movement";
                     button = find_button(name);
                 }
                 else if (GBTN_IS_RIGHT_ANALOG(button->gbtn))
                 {
                     name = "right_analog";
-                    value = "mouse_movement";
+                    token = "mouse_movement";
                     button = find_button(name);
                 }
             }
 
-            set_btn_config(config->current_config, button->gbtn, name, value);
+            set_btn_config(config->current_config, button->gbtn, name, token, token_state);
             // GPTK2_DEBUG("G: %s: %s, (%s, %d)\n", name, value, button->str, button->gbtn);
         }
         else if (strcasecmp(name, "overlay") == 0)
         {
-            if (strcasecmp(value, "parent") == 0)
+            if (strcasecmp(token, "parent") == 0)
             {
                 // GPTK2_DEBUG("overlay = parent\n");
                 config_overlay_parent(config->current_config);
             }
-            else if (strcasecmp(value, "clear") == 0)
+            else if (strcasecmp(token, "clear") == 0)
             {
                 // GPTK2_DEBUG("overlay = clear\n");
                 config_overlay_clear(config->current_config);
             }
-            else if (strlen(value) > 0)
+            else if (strlen(token) > 0)
             {
                 // GPTK2_DEBUG("overlay = %s\n", value);
-                config_overlay_named(config->current_config, value);
+                config_overlay_named(config->current_config, token);
             }
             else
             {
@@ -1182,14 +1219,14 @@ static int config_ini_handler(
         }
         else
         {
-            set_cfg_config(name, value);
+            set_cfg_config(name, token, token_state);
             // GPTK2_DEBUG("G: %s: %s\n", name, value);
         }
     }
 
     else if (config->state == CFG_CONFIG)
     {   // config mode.
-        set_cfg_config(name, value);
+        set_cfg_config(name, token, token_state);
         // GPTK2_DEBUG("C: %s: %s\n", name, value);
     }
 
@@ -1199,25 +1236,25 @@ static int config_ini_handler(
 
         if (button != NULL)
         {
-            set_btn_config(config->current_config, button->gbtn, name, value);
+            set_btn_config(config->current_config, button->gbtn, name, token, token_state);
             // GPTK2_DEBUG("X: %s: %s (%s, %d)\n", name, value, button->str, button->gbtn);
         }
         else if (strcasecmp(name, "overlay") == 0)
         {
-            if (strcasecmp(value, "parent") == 0)
+            if (strcasecmp(token, "parent") == 0)
             {
                 // GPTK2_DEBUG("overlay = parent\n");
                 config_overlay_parent(config->current_config);
             }
-            else if (strcasecmp(value, "clear") == 0)
+            else if (strcasecmp(token, "clear") == 0)
             {
                 // GPTK2_DEBUG("overlay = clear\n");
                 config_overlay_clear(config->current_config);
             }
-            else if (strlen(value) > 0)
+            else if (strlen(token) > 0)
             {
                 // GPTK2_DEBUG("overlay = %s\n", value);
-                config_overlay_named(config->current_config, value);
+                config_overlay_named(config->current_config, token);
             }
             else
             {
@@ -1226,22 +1263,30 @@ static int config_ini_handler(
         }
         else if (strcasecmp(name, "charset") == 0)
         {
-            const char_set *cfg_charset = find_char_set(value);
+            const char_set *cfg_charset = find_char_set(token);
             if (cfg_charset == NULL)
-                fprintf(stderr, "charset unable to find \"%s\" charset\n", value);
-
+            {
+                fprintf(stderr, "charset unable to find \"%s\" charset\n", token);
+            }
             else
-                config->current_config->charset = string_register(value);
+            {
+                config->current_config->charset = string_register(token);
+                config->current_config->wordset = NULL;
+            }
         }
         else if (strcasecmp(name, "wordset") == 0)
         {
-            const word_set *cfg_wordset = find_word_set(value);
+            const word_set *cfg_wordset = find_word_set(token);
 
             if (cfg_wordset == NULL)
-                fprintf(stderr, "wordset unable to find \"%s\" wordset\n", value);
-
+            {
+                fprintf(stderr, "wordset unable to find \"%s\" wordset\n", token);
+            }
             else
-                config->current_config->wordset = string_register(value);
+            {
+                config->current_config->wordset = string_register(token);
+                config->current_config->charset = NULL;
+            }
         }
         else
         {
@@ -1253,6 +1298,7 @@ static int config_ini_handler(
         GPTK2_DEBUG("?: %s: %s\n", name, value);
     }
 
+    tokens_free(token_state);
     return 1;
 }
 
@@ -1283,11 +1329,16 @@ int config_load(const char *file_name, bool config_only)
 void config_finalise()
 {   // this will check all the configs loaded and link the cfg_name to cfg_maps
     gptokeyb_config *current = root_config;
-    gptokeyb_config *other;
 
     if (gptk_hk_can_fix && gptk_hk_fix_offset > 0)
     {   // if it has only seen a gptk file we can convert <key>_hk automatically.
-        set_btn_config(current, current_state.hotkey_gbtn, "hotkey", "hold_state hotkey");
+        char *value = "hold_state\thotkey";
+        token_ctx *token_state = tokens_create(value, '\t');
+        const char *token = tokens_next(token_state);
+
+        set_btn_config(current, current_state.hotkey_gbtn, "hotkey", token, token_state);
+
+        tokens_free(token_state);
 
         current = config_create("controls:hotkey");
 
@@ -1296,7 +1347,7 @@ void config_finalise()
         for (int i=0; i < gptk_hk_fix_offset; i++)
         {
             char *name = gptk_hk_fix_text[i];
-            char *value = strchr(gptk_hk_fix_text[i], '=');
+            value = strchr(gptk_hk_fix_text[i], '=');
             value++;
 
             // printf("REGESTERING: '%s' = '%s'", name, value);
@@ -1321,7 +1372,11 @@ void config_finalise()
 
             int btn = button->gbtn;
 
-            set_btn_config(current, btn, name, value);
+            token_state = tokens_create(value, '\t');
+
+            set_btn_config(current, btn, name, value, token_state);
+
+            tokens_free(token_state);
             // printf("\n");
         }
 
@@ -1338,8 +1393,8 @@ void config_finalise()
             for (int btn=0; btn < GBTN_MAX; btn++)
             {
                 // FUCK IT ALL
-                if ((current->dpad_as_mouse && GBTN_IS_DPAD(btn)) || 
-                    (current->left_analog_as_mouse  && GBTN_IS_LEFT_ANALOG(btn)) || 
+                if ((current->dpad_as_mouse && GBTN_IS_DPAD(btn)) ||
+                    (current->left_analog_as_mouse  && GBTN_IS_LEFT_ANALOG(btn)) ||
                     (current->right_analog_as_mouse && GBTN_IS_RIGHT_ANALOG(btn)))
                 {
                     current->button[btn].keycode = 0;

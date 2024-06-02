@@ -45,7 +45,6 @@ typedef struct _string_reg
 } string_reg;
 
 static string_reg *root_string = NULL;
-static int string_reg_last_reorder_counter=0;
 
 
 void *gptk_malloc(size_t size)
@@ -474,8 +473,8 @@ bool process_with_kill(const char *process_name, bool use_sudo)
         int pid = atoi(pid_str);
 
         // Kill the process
-        if (want_sudo)
-            snprintf(temp_buffer, KILL_BUFFER, "kill -9 %d", pid);
+        if (use_sudo)
+            snprintf(temp_buffer, KILL_BUFFER, "sudo kill -9 %d", pid);
         else
             snprintf(temp_buffer, KILL_BUFFER, "kill -9 %d", pid);
 
@@ -501,7 +500,7 @@ bool process_with_kill(const char *process_name, bool use_sudo)
 }
 
 
-bool process_with_pc_quit()
+void process_with_pc_quit()
 {
     emitKey(KEY_F4, true, KEY_LEFTALT);
     SDL_Delay(15);

@@ -18,21 +18,21 @@
 * Authored by: Kris Henriksen <krishenriksen.work@gmail.com>
 #
 * AnberPorts-Keyboard-Mouse
-* 
+*
 * Part of the code is from from https://github.com/krishenriksen/AnberPorts/blob/master/AnberPorts-Keyboard-Mouse/main.c (mostly the fake keyboard)
 * Fake Xbox code from: https://github.com/Emanem/js2xbox
-* 
+*
 * Modified (badly) by: Shanti Gilbert for EmuELEC
 * Modified further by: Nikolai Wuttke for EmuELEC (Added support for SDL and the SDLGameControllerdb.txt)
 * Modified further by: Jacob Smith
-* 
-* Any help improving this code would be greatly appreciated! 
-* 
+*
+* Any help improving this code would be greatly appreciated!
+*
 * DONE: Xbox360 mode: Fix triggers so that they report from 0 to 255 like real Xbox triggers
 *       Xbox360 mode: Figure out why the axis are not correctly labeled?  SDL_CONTROLLER_AXIS_RIGHTX / SDL_CONTROLLER_AXIS_RIGHTY / SDL_CONTROLLER_AXIS_TRIGGERLEFT / SDL_CONTROLLER_AXIS_TRIGGERRIGHT
 *       Keyboard mode: Add a config file option to load mappings from.
 *       add L2/R2 triggers
-* 
+*
 */
 
 #include "gptokeyb2.h"
@@ -94,10 +94,23 @@ const word_set *active_word_set;
 
 char input_text[MAX_TEXT_LENGTH+1] = {0};
 
-int current_letter = 0;
-int current_offset = 0;
+size_t current_letter = 0;
+size_t current_offset = 0;
 
-int current_word = 0;
+size_t current_word = 0;
+
+
+void disable_input()
+{
+    active_char_set = NULL;
+    active_word_set = NULL;
+}
+
+
+bool input_active()
+{
+    return (active_char_set != NULL || active_word_set != NULL);
+}
 
 
 char_set *_find_char_set(const char *name)
@@ -169,6 +182,8 @@ const word_set *find_word_set(const char *name)
 
 void input_init()
 {
+    // Tag these as builtin charsets, if you override them they will be tagged as custom.
+    // This helps the dumping code.
     char_set_builtin_mode = true;
 
     register_char_set("basic",    "ABCDEFGHIJKLMNOPQRSTUVWXYZ .,-_() 0123456789 ");
@@ -182,12 +197,12 @@ void input_init()
 
     const char_set *full_set = find_char_set("full");
 
-    int character_len = strlen(full_set->characters);
+    size_t character_len = strlen(full_set->characters);
     const keyboard_values *keyinfo;
     memset((void*)characters, '\0', sizeof(characters));
     char find_buff[3] = "\0\0\0";
 
-    for (int i = 0; i < character_len; i++)
+    for (size_t i = 0; i < character_len; i++)
     {
         find_buff[0] = full_set->characters[i];
         keyinfo = find_keyboard(find_buff);
@@ -198,8 +213,8 @@ void input_init()
             continue;
         }
 
-        characters[full_set->characters[i]].keycode = keyinfo->keycode;
-        characters[full_set->characters[i]].shift   = (keyinfo->modifier & MOD_SHIFT) != 0;
+        characters[(unsigned char)full_set->characters[i]].keycode = keyinfo->keycode;
+        characters[(unsigned char)full_set->characters[i]].shift   = (keyinfo->modifier & MOD_SHIFT) != 0;
     }
 }
 
@@ -240,7 +255,7 @@ void dump_word_sets()
     {
         printf("wordset = \"%s\"", curr_word_set->name);
 
-        for (int i=0; i < curr_word_set->words_len; i++)
+        for (size_t i=0; i < curr_word_set->words_len; i++)
         {
             if (strchr(curr_word_set->words[i], '"') == NULL)
                 printf(" \"%s\"", curr_word_set->words[i]);
@@ -287,7 +302,7 @@ void register_char_set(const char *name, const char *characters)
         else
         {
             root_char_set = new_char_set;
-        }        
+        }
     }
 }
 
@@ -319,10 +334,11 @@ void register_word_set(const char *name, const char *word)
         curr_word_set->words_alloc = new_size;
     }
 
-    printf("register_word_set(%s, %s)\n", name, word);
+    // printf("register_word_set(%s, %s)\n", name, word);
 
     curr_word_set->words[curr_word_set->words_len++] = string_register(word);
 }
+
 
 void input_quit()
 {
@@ -357,48 +373,69 @@ void input_quit()
 }
 
 
-void load_char_set(const char *name)
-{
+void input_load_char_set(const char *name)
+{   // load a char set, deactivate any word sets.
     active_char_set = find_char_set(name);
+
     if (active_char_set == NULL)
-    {
+    {   // we always fallback to the basic charset.
         fprintf(stderr, "Unknown wordset \"%s\".\n", name);
 
         active_char_set = find_char_set("basic");
     }
+    else
+        printf("Loaded char set \"%s\"\n", name);
 
+    // Clear the active word set
     active_word_set = NULL;
 }
 
-void load_word_set(const char *name)
-{
-    active_word_set = find_word_set(name);
-    active_char_set = NULL;
+
+void input_load_word_set(const char *name)
+{   // load a word set, deactivate any char sets.
+    const word_set *temp_wordset = find_word_set(name);;
 
     if (active_word_set == NULL)
     {
         fprintf(stderr, "Unknown wordset \"%s\".\n", name);
         return;
     }
+
+    printf("Loaded word set \"%s\"\n", name);
+    active_word_set = temp_wordset;
+    active_char_set = NULL;
 }
+
+
+void input_stop()
+{
+    if (active_word_set != NULL || active_char_set != NULL)
+        printf("Cleared input sets\n");
+
+    active_word_set = NULL;
+    active_char_set = NULL;
+}
+
 
 void input_rem_char()
 {
+    // printf("input_rem_char\n");
+
     emitTextInputKey(KEY_BACKSPACE, false);
 }
 
 
 void input_add_char()
 {
-    printf("input_add_char -- %s\n", input_text);
+    // printf("input_add_char -- %s\n", input_text);
 
     emitTextInputKey(
-        characters[input_text[current_offset]].keycode,
-        characters[input_text[current_offset]].shift);
+        characters[(unsigned char)input_text[current_offset]].keycode,
+        characters[(unsigned char)input_text[current_offset]].shift);
 }
 
 
-void clear_input_state()
+void input_clear_state()
 {
     while (current_offset > 0)
     {
@@ -407,7 +444,22 @@ void clear_input_state()
 }
 
 
-void set_input_state(const char *buff, size_t buff_len)
+void input_accept()
+{
+    emitTextInputKey(KEY_ENTER, false);
+    pop_state();
+}
+
+
+void input_cancel()
+{
+    input_clear_state();
+    emitTextInputKey(KEY_ENTER, false);
+    pop_state();
+}
+
+
+void input_set_state(const char *buff, size_t buff_len)
 {
     if (buff_len >= MAX_TEXT_LENGTH)
     {
@@ -420,7 +472,7 @@ void set_input_state(const char *buff, size_t buff_len)
     buff_len = strlen(input_text) - 1;
     current_offset = 0;
 
-    for (int i=0; i <= buff_len; i++)
+    for (size_t i=0; i <= buff_len; i++)
     {
         current_offset = i;
         input_add_char();
@@ -428,7 +480,7 @@ void set_input_state(const char *buff, size_t buff_len)
 }
 
 
-void get_input_state(char *buff, size_t buff_len)
+void input_get_state(char *buff, size_t buff_len)
 {
     if (buff_len > 0)
     {
@@ -436,6 +488,7 @@ void get_input_state(char *buff, size_t buff_len)
         {
             buff_len = current_offset + 1;
         }
+
         strncpy(buff, input_text, buff_len - 1);
 
         buff[buff_len - 1] = '\0';
@@ -450,6 +503,7 @@ void input_add_letter()
         current_offset++;
         input_text[current_offset] = active_char_set->characters[current_letter];
         input_text[current_offset + 1] = '\0';
+
         input_add_char();
     }
 }
@@ -472,10 +526,6 @@ void input_next_letter(int amount)
     if (active_char_set)
     {
         current_letter = (current_letter + amount) % active_char_set->characters_len;
-        if (current_letter < 0)
-        {
-            current_letter += active_char_set->characters_len;
-        }
 
         input_rem_char();
         input_text[current_offset] = active_char_set->characters[current_letter];
@@ -489,10 +539,6 @@ void input_prev_letter(int amount)
     if (active_char_set)
     {
         current_letter = (current_letter - amount) % active_char_set->characters_len;
-        if (current_letter < 0)
-        {
-            current_letter += active_char_set->characters_len;
-        }
 
         input_rem_char();
         input_text[current_offset] = active_char_set->characters[current_letter];
@@ -506,13 +552,9 @@ void input_next_word(int amount)
     if (active_word_set)
     {
         current_word = (current_word + amount) % active_word_set->words_len;
-        if (current_word < 0)
-        {
-            current_word += active_word_set->words_len;
-        }
 
-        clear_input_state();
-        set_input_state(
+        input_clear_state();
+        input_set_state(
             active_word_set->words[current_word],
             strlen(active_word_set->words[current_word]));
     }
@@ -523,15 +565,11 @@ void input_prev_word(int amount)
     if (active_word_set)
     {
         current_word = (current_word - amount) % active_word_set->words_len;
-        if (current_word < 0)
-        {
-            current_word += active_word_set->words_len;
-        }
 
-        clear_input_state();
-        set_input_state(
+        input_clear_state();
+        input_set_state(
             active_word_set->words[current_word],
             strlen(active_word_set->words[current_word]));
-    }    
+    }
 }
 

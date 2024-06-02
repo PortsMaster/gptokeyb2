@@ -55,7 +55,7 @@
 
 #include <SDL.h>
 
-#define GPTK2_VERSION "2.00.01"
+#define GPTK2_VERSION "2.00.03"
 
 #define GPTK2_DEBUG_ENABLED
 
@@ -167,7 +167,7 @@ enum
 
 
 enum
-{
+{   // Action mode
     ACT_NONE,
     ACT_PARENT,
     ACT_SPECIAL,
@@ -181,7 +181,7 @@ enum
 
 
 enum
-{
+{   // Special mode
     SPC_NONE,
     SPC_MOUSE_SLOW,
 
@@ -198,6 +198,12 @@ enum
     SPC_CANCEL_INPUT,
 };
 
+enum
+{   // Overlay mode
+    OVL_NONE,
+    OVL_PARENT,
+    OVL_CLEAR,
+};
 
 // simple tokenizer
 typedef struct _token_ctx token_ctx;
@@ -232,6 +238,8 @@ struct _gptokeyb_config
 
     const char *input_return_name;
     gptokeyb_config *input_return_map;
+
+    int overlay_mode; // one of OVL_NONE / PARENT / CLEAR / NAMED
 
     // one of MOUSE_MOVEMENT_PARENT / OFF / ON
     int left_analog_as_mouse;
@@ -443,11 +451,19 @@ void input_quit();
 void register_char_set(const char *name, const char *characters);
 void register_word_set(const char *name, const char *word);
 
-void load_char_set(const char *name);
-void load_word_set(const char *name);
+void input_load_char_set(const char *name);
+void input_load_word_set(const char *name);
+void input_stop();
 
-void set_input_state(const char *buff, size_t buff_len);
-void clear_input_state();
+void input_accept();
+void input_cancel();
+
+void input_disable();
+
+bool input_active();
+
+void input_set_state(const char *buff, size_t buff_len);
+void input_clear_state();
 
 void dump_word_sets();
 void dump_char_sets();

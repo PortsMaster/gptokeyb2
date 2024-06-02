@@ -18,21 +18,21 @@
 * Authored by: Kris Henriksen <krishenriksen.work@gmail.com>
 #
 * AnberPorts-Keyboard-Mouse
-* 
+*
 * Part of the code is from from https://github.com/krishenriksen/AnberPorts/blob/master/AnberPorts-Keyboard-Mouse/main.c (mostly the fake keyboard)
 * Fake Xbox code from: https://github.com/Emanem/js2xbox
-* 
+*
 * Modified (badly) by: Shanti Gilbert for EmuELEC
 * Modified further by: Nikolai Wuttke for EmuELEC (Added support for SDL and the SDLGameControllerdb.txt)
 * Modified further by: Jacob Smith
-* 
-* Any help improving this code would be greatly appreciated! 
-* 
+*
+* Any help improving this code would be greatly appreciated!
+*
 * DONE: Xbox360 mode: Fix triggers so that they report from 0 to 255 like real Xbox triggers
 *       Xbox360 mode: Figure out why the axis are not correctly labeled?  SDL_CONTROLLER_AXIS_RIGHTX / SDL_CONTROLLER_AXIS_RIGHTY / SDL_CONTROLLER_AXIS_TRIGGERLEFT / SDL_CONTROLLER_AXIS_TRIGGERRIGHT
 *       Keyboard mode: Add a config file option to load mappings from.
 *       add L2/R2 triggers
-* 
+*
 */
 
 #include "gptokeyb2.h"
@@ -235,20 +235,22 @@ void state_update()
 
 
 void state_change_update()
-{   // check as mouse_move
+{   // check as mouse_move and input set stuff.
+
     #define NOT_FOUND_DPADS (!found_dpad_as_mouse || !found_left_analog_as_mouse || !found_right_analog_as_mouse)
+
+    #define NOT_FOUND_INPUT_SETS ((found_charset == NULL) && (found_wordset == NULL))
 
     bool found_dpad_as_mouse = false;
     bool found_left_analog_as_mouse = false;
     bool found_right_analog_as_mouse = false;
 
-    int left_analog_as_mouse;
-    int right_analog_as_mouse;
-    int dpad_as_mouse;
+    const char *found_charset = NULL;
+    const char *found_wordset = NULL;
 
     // check temp stacks
     int order_id = config_temp_stack_order_id;
-    while (order_id > 0 && NOT_FOUND_DPADS)
+    while (order_id > 0)
     {
         for (int sbtn=0; sbtn < GBTN_MAX; sbtn++)
         {
@@ -259,6 +261,51 @@ void state_change_update()
                 continue;
 
             gptokeyb_config *current = config_temp_stack[sbtn];
+
+            if (NOT_FOUND_INPUT_SETS)
+            {
+                found_charset = current->charset;
+                found_wordset = current->wordset;
+            }
+
+            if (NOT_FOUND_DPADS)
+            {
+                if (!found_dpad_as_mouse && current->dpad_as_mouse != MOUSE_MOVEMENT_PARENT)
+                {
+                    current_dpad_as_mouse = (current->dpad_as_mouse == MOUSE_MOVEMENT_ON);
+                    found_dpad_as_mouse = true;
+                }
+
+                if (!found_left_analog_as_mouse && current->left_analog_as_mouse != MOUSE_MOVEMENT_PARENT)
+                {
+                    current_left_analog_as_mouse = (current->left_analog_as_mouse == MOUSE_MOVEMENT_ON);
+                    found_left_analog_as_mouse = true;
+                }
+
+                if (!found_right_analog_as_mouse && current->right_analog_as_mouse != MOUSE_MOVEMENT_PARENT)
+                {
+                    current_right_analog_as_mouse = (current->right_analog_as_mouse == MOUSE_MOVEMENT_ON);
+                    found_right_analog_as_mouse = true;
+                }
+            }
+        }
+
+        order_id--;
+    }
+
+    int current_depth = gptokeyb_config_depth;
+
+    while (current_depth >= 0)
+    {
+        if (NOT_FOUND_INPUT_SETS)
+        {
+            found_charset = config_stack[current_depth]->charset;
+            found_wordset = config_stack[current_depth]->wordset;
+        }
+
+        if (NOT_FOUND_DPADS)
+        {
+            gptokeyb_config *current = config_stack[current_depth];
 
             if (!found_dpad_as_mouse && current->dpad_as_mouse != MOUSE_MOVEMENT_PARENT)
             {
@@ -279,34 +326,20 @@ void state_change_update()
             }
         }
 
-        order_id--;
+        current_depth--;
     }
 
-    int current_depth = gptokeyb_config_depth;
-
-    while (current_depth >= 0 && NOT_FOUND_DPADS)
+    if (found_charset)
     {
-        gptokeyb_config *current = config_stack[current_depth];
-
-        if (!found_dpad_as_mouse && current->dpad_as_mouse != MOUSE_MOVEMENT_PARENT)
-        {
-            current_dpad_as_mouse = (current->dpad_as_mouse == MOUSE_MOVEMENT_ON);
-            found_dpad_as_mouse = true;
-        }
-
-        if (!found_left_analog_as_mouse && current->left_analog_as_mouse != MOUSE_MOVEMENT_PARENT)
-        {
-            current_left_analog_as_mouse = (current->left_analog_as_mouse == MOUSE_MOVEMENT_ON);
-            found_left_analog_as_mouse = true;
-        }
-
-        if (!found_right_analog_as_mouse && current->right_analog_as_mouse != MOUSE_MOVEMENT_PARENT)
-        {
-            current_right_analog_as_mouse = (current->right_analog_as_mouse == MOUSE_MOVEMENT_ON);
-            found_right_analog_as_mouse = true;
-        }
-
-        current_depth--;
+        input_load_char_set(found_charset);
+    }
+    else if (found_wordset)
+    {
+        input_load_word_set(found_wordset);
+    }
+    else
+    {
+        input_stop();
     }
 
     if (!found_dpad_as_mouse)
@@ -386,13 +419,13 @@ void update_button(int btn, bool pressed)
     {
         // GPTK2_DEBUG("%s -> %s\n", gbtn_names[btn], (pressed ? "pressed" : "released"));
 
-        if ((current_state.in_repeat & btn_mask) == 0)
-        {
+        if ((current_state.in_repeat & btn_mask) != 0)
+        {   // if we're in repeat we get the held button.
             current_state.held_since[btn] = current_ticks;
             button = current_state.button_held[btn];
         }
         else
-        {
+        {   // Otherwise we find it out from the stack.
             button = state_button(btn);
             current_state.button_held[btn] = button;
         }
@@ -407,24 +440,33 @@ void update_button(int btn, bool pressed)
 
         else if (button->action >= ACT_STATE_HOLD)
         {   // change control state
-            if (button->action == ACT_STATE_HOLD)
+            if (!(current_state.in_repeat & btn_mask))
             {
-                push_temp_state(button->cfg_map, btn);
-                current_state.pop_held |= btn_mask;
-            }
-            else  if (button->action == ACT_STATE_SET)
-            {
-                set_state(button->cfg_map);
-            }
-            else
-            {
-                push_state(button->cfg_map);
+                if (button->action == ACT_STATE_HOLD)
+                {
+                    push_temp_state(button->cfg_map, btn);
+                    current_state.pop_held |= btn_mask;
+                }
+                else if (button->action == ACT_STATE_SET)
+                {
+                    set_state(button->cfg_map);
+                }
+                else
+                {
+                    push_state(button->cfg_map);
+                }
             }
 
             if (button->keycode != 0)
             {
                 GPTK2_DEBUG("PRESSED '%s' -> '%s'\n", gbtn_names[btn], find_keycode(button->keycode));
-                emitKey(button->keycode, true, button->modifier);                
+                emitKey(button->keycode, true, button->modifier);
+
+                if (button->repeat && !(current_state.in_repeat & btn_mask))
+                {
+                    current_state.in_repeat |= btn_mask;
+                    current_state.next_repeat[btn] = (current_ticks + current_state.repeat_delay);
+                }
             }
         }
         else if (button->action == ACT_SPECIAL && button->special == SPC_MOUSE_SLOW)
@@ -432,43 +474,48 @@ void update_button(int btn, bool pressed)
             current_state.mouse_slow |= btn_mask;
         }
         else if (button->action == ACT_SPECIAL && button->special >= SPC_ADD_LETTER)
-        {   // this way we can always clear the mouse_slow flag if the state changes.
+        {   // special controls
+
             switch (button->special)
             {
             case SPC_ADD_LETTER:
-                input_add_letter();
+                if (input_active())
+                    input_add_letter();
                 break;
 
             case SPC_REM_LETTER:
-                input_rem_letter();
+                if (input_active())
+                    input_rem_letter();
                 break;
 
             case SPC_NEXT_LETTER:
-                input_next_letter(1);
+                if (input_active())
+                    input_next_letter(1);
                 break;
 
             case SPC_PREV_LETTER:
-                input_prev_letter(1);
+                if (input_active())
+                    input_prev_letter(1);
                 break;
 
             case SPC_NEXT_WORD:
-                input_next_word(1);
+                if (input_active())
+                    input_next_word(1);
                 break;
 
             case SPC_PREV_WORD:
-                input_prev_word(1);
+                if (input_active())
+                    input_prev_word(1);
                 break;
 
             case SPC_ACCEPT_INPUT:
-                emitTextInputKey(KEY_ENTER, false);
-                pop_state(button->cfg_map);
-                set_input_state("", 0);
+                if (input_active())
+                    input_accept();
                 break;
 
             case SPC_CANCEL_INPUT:
-                clear_input_state();
-                emitTextInputKey(KEY_ENTER, false);
-                pop_state(button->cfg_map);
+                if (input_active())
+                    input_cancel();
                 break;
 
             default:
@@ -494,7 +541,10 @@ void update_button(int btn, bool pressed)
     else if (was_released(btn))
     {
         button = current_state.button_held[btn];
-        current_state.button_held[btn] = NULL;
+
+        // Not repeating this button, lets clear the held button
+        if ((current_state.in_repeat & btn_mask) == 0)
+            current_state.button_held[btn] = NULL;
 
         if (button == NULL)
             return;

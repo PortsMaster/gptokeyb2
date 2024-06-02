@@ -18,21 +18,21 @@
 * Authored by: Kris Henriksen <krishenriksen.work@gmail.com>
 #
 * AnberPorts-Keyboard-Mouse
-* 
+*
 * Part of the code is from from https://github.com/krishenriksen/AnberPorts/blob/master/AnberPorts-Keyboard-Mouse/main.c (mostly the fake keyboard)
 * Fake Xbox code from: https://github.com/Emanem/js2xbox
-* 
+*
 * Modified (badly) by: Shanti Gilbert for EmuELEC
 * Modified further by: Nikolai Wuttke for EmuELEC (Added support for SDL and the SDLGameControllerdb.txt)
 * Modified further by: Jacob Smith
-* 
-* Any help improving this code would be greatly appreciated! 
-* 
+*
+* Any help improving this code would be greatly appreciated!
+*
 * DONE: Xbox360 mode: Fix triggers so that they report from 0 to 255 like real Xbox triggers
 *       Xbox360 mode: Figure out why the axis are not correctly labeled?  SDL_CONTROLLER_AXIS_RIGHTX / SDL_CONTROLLER_AXIS_RIGHTY / SDL_CONTROLLER_AXIS_TRIGGERLEFT / SDL_CONTROLLER_AXIS_TRIGGERRIGHT
 *       Keyboard mode: Add a config file option to load mappings from.
 *       add L2/R2 triggers
-* 
+*
 */
 
 #include "gptokeyb2.h"
@@ -129,8 +129,8 @@ void dz_scaled_radial(vector2d *vec2d_ouput, const vector2d *vec2d_input, float 
 
 void dz_sloped_axial(vector2d *vec2d_ouput, const vector2d *vec2d_input, float deadzone)
 {
-    float deadzone_x = deadzone * abs(vec2d_input->x);
-    float deadzone_y = deadzone * abs(vec2d_input->y);
+    float deadzone_x = deadzone * fabs(vec2d_input->x);
+    float deadzone_y = deadzone * fabs(vec2d_input->y);
 
     vector2d_set_vector2d(vec2d_ouput, vec2d_input);
 
@@ -143,18 +143,18 @@ void dz_sloped_axial(vector2d *vec2d_ouput, const vector2d *vec2d_input, float d
 
 void dz_sloped_scaled_axial(vector2d *vec2d_ouput, const vector2d *vec2d_input, float deadzone)
 {
-    float deadzone_x = deadzone * abs(vec2d_input->x);
-    float deadzone_y = deadzone * abs(vec2d_input->y);
+    float deadzone_x = deadzone * fabs(vec2d_input->x);
+    float deadzone_y = deadzone * fabs(vec2d_input->y);
 
     vector2d sign;
 
     vector2d_set_float2(&sign, get_sign(vec2d_input->x), get_sign(vec2d_input->y));
 
     if (fabs(vec2d_input->x) > deadzone_x)
-        vec2d_ouput->x = sign.x * map_range(abs(vec2d_input->x), deadzone_x, 1.0, 0.0, 1.0);
+        vec2d_ouput->x = sign.x * map_range(fabs(vec2d_input->x), deadzone_x, 1.0, 0.0, 1.0);
 
     if (fabs(vec2d_input->y) > deadzone_y)
-        vec2d_ouput->y = sign.y * map_range(abs(vec2d_input->y), deadzone_y, 1.0, 0.0, 1.0);
+        vec2d_ouput->y = sign.y * map_range(fabs(vec2d_input->y), deadzone_y, 1.0, 0.0, 1.0);
 }
 
 
@@ -184,7 +184,7 @@ void dz_exp(vector2d *vec2d_ouput, const vector2d *vec2d_input, float deadzone, 
     dz_scaled_radial(&partial_output, vec2d_input, deadzone);
     input_magnitude = vector2d_magnitude(&partial_output);
 
-    if (abs(input_magnitude) < 0.0001)
+    if (fabs(input_magnitude) < 0.0001)
         return;
 
     vec2d_ouput->x = (partial_output.x / input_magnitude) * pow(input_magnitude, n);
@@ -222,7 +222,7 @@ int deadzone_get_mode(const char *str)
 const char *deadzone_mode_str(int mode)
 {
 
-    switch(current_state.deadzone_mode)
+    switch(mode)
     {
     default:
     case DZ_DEFAULT:

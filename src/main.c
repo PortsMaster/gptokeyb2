@@ -18,21 +18,21 @@
 * Authored by: Kris Henriksen <krishenriksen.work@gmail.com>
 #
 * AnberPorts-Keyboard-Mouse
-* 
+*
 * Part of the code is from from https://github.com/krishenriksen/AnberPorts/blob/master/AnberPorts-Keyboard-Mouse/main.c (mostly the fake keyboard)
 * Fake Xbox code from: https://github.com/Emanem/js2xbox
-* 
+*
 * Modified (badly) by: Shanti Gilbert for EmuELEC
 * Modified further by: Nikolai Wuttke for EmuELEC (Added support for SDL and the SDLGameControllerdb.txt)
 * Modified further by: Jacob Smith
-* 
-* Any help improving this code would be greatly appreciated! 
-* 
+*
+* Any help improving this code would be greatly appreciated!
+*
 * DONE: Xbox360 mode: Fix triggers so that they report from 0 to 255 like real Xbox triggers
 *       Xbox360 mode: Figure out why the axis are not correctly labeled?  SDL_CONTROLLER_AXIS_RIGHTX / SDL_CONTROLLER_AXIS_RIGHTY / SDL_CONTROLLER_AXIS_TRIGGERLEFT / SDL_CONTROLLER_AXIS_TRIGGERRIGHT
 *       Keyboard mode: Add a config file option to load mappings from.
 *       add L2/R2 triggers
-* 
+*
 */
 
 #include "gptokeyb2.h"
@@ -114,6 +114,15 @@ int main(int argc, char* argv[])
     int opt;
     char default_control[MAX_CONTROL_NAME] = "";
 
+    // Fix some old gptokeyb settings.
+    for (int k=0; k < argc; k++)
+    {
+        if (strcmp(argv[k], "-sudokill") == 0)
+        {   // This needs to be "-s"
+            argv[k][2] = '\0';
+        }
+    }
+
     while ((opt = getopt(argc, argv, "vk1g:hdxp:c:ZXPH:s:")) != -1)
     {
         switch (opt)
@@ -138,7 +147,7 @@ int main(int argc, char* argv[])
 
         case 'X':
             if (!want_kill)
-            {            
+            {
                 printf("Using kill mode.\n");
                 want_kill = true;
             }
@@ -146,7 +155,7 @@ int main(int argc, char* argv[])
 
         case 'Z':
             if (want_kill)
-            {            
+            {
                 printf("Using pkill mode.\n");
                 want_kill = false;
             }
@@ -154,7 +163,7 @@ int main(int argc, char* argv[])
 
         case 'P':
             if (!want_pc_quit)
-            {            
+            {
                 printf("Using pc quit mode.\n");
                 want_pc_quit = true;
             }
@@ -201,16 +210,19 @@ int main(int argc, char* argv[])
             break;
 
         case '?':
-            if (optopt == 'c')
-                fprintf (stderr, "Option -%c requires an argument.\n", optopt);
-            else if (isprint (optopt))
-                fprintf (stderr, "Unknown option `-%c'.\n", optopt);
-            else
-                fprintf (stderr, "Unknown option character `\\x%x'.\n", optopt);
-
-            fprintf(stderr, "\n");
-
         case 'h':
+            if (opt == '?')
+            {
+                if (optopt == 'c')
+                    fprintf (stderr, "Option -%c requires an argument.\n", optopt);
+                else if (isprint (optopt))
+                    fprintf (stderr, "Unknown option `-%c'.\n", optopt);
+                else
+                    fprintf (stderr, "Unknown option character `\\x%x'.\n", optopt);
+
+                fprintf(stderr, "\n");
+            }
+
             fprintf(stderr, "Usage: %s <program> [-dPXZ] [-H hotkey] [-c <config.ini>] [-p control_mode]\n",
                 argv[0]);
             fprintf(stderr, "\n");
@@ -249,14 +261,15 @@ int main(int argc, char* argv[])
                 size_t kill_process_name_len = strlen(kill_process_name);
 
                 // strip these suffixes
-                char *suffixes[] = {".x86_64", ".x86", ".aarch64", ".arm64", ".armhf", ".arm", ".32", ".64"};
+                char *suffixes[] = {
+                    ".x86_64", ".x86", ".aarch64", ".arm64", ".armhf", ".arm", ".32", ".64"};
                 bool changed = false;
 
-                for (int i=0; i < (sizeof(suffixes) / sizeof(suffixes[0])); i++)
+                for (size_t j=0; j < (sizeof(suffixes) / sizeof(suffixes[0])); j++)
                 {
-                    if (strcaseendswith(kill_process_name, suffixes[i]))
+                    if (strcaseendswith(kill_process_name, suffixes[j]))
                     {
-                        strncpy(game_prefix, kill_process_name, kill_process_name_len - strlen(suffixes[i]));
+                        strncpy(game_prefix, kill_process_name, kill_process_name_len - strlen(suffixes[j]));
                         changed = true;
                         break;
                     }
@@ -342,7 +355,7 @@ int main(int argc, char* argv[])
     }
 
     // Create fake input device (not needed in kill mode)
-    //if (!kill_mode) {  
+    //if (!kill_mode) {
     if (config_mode || xbox360_mode)
     {   // initialise device, even in kill mode, now that kill mode will work with config & xbox modes
         uinp_fd = open("/dev/uinput", O_WRONLY | O_NONBLOCK);

@@ -12,6 +12,8 @@ set(CMAKE_C_COMPILER_TARGET ${triple})
 set(CMAKE_CXX_COMPILER g++)
 set(CMAKE_CXX_COMPILER_TARGET ${triple})
 
+add_compile_options(-Wall -Wextra -pedantic -Werror)
+
 cmake_minimum_required(VERSION 3.0.0)
 project(gptokeyb
         VERSION 0.2.0

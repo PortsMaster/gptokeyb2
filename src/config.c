@@ -1329,25 +1329,26 @@ int config_load(const char *file_name, bool config_only)
 void config_finalise()
 {   // this will check all the configs loaded and link the cfg_name to cfg_maps
     gptokeyb_config *current = root_config;
+    char* env_textinput = SDL_getenv("TEXTINPUTINTERACTIVE");
 
-    if (gptk_hk_can_fix && gptk_hk_fix_offset > 0)
+    if (gptk_hk_can_fix && (gptk_hk_fix_offset > 0 || (env_textinput != NULL && atob_default(env_textinput, true) == true)))
     {   // if it has only seen a gptk file we can convert <key>_hk automatically.
-        char *value = "hold_state\thotkey";
-        token_ctx *token_state = tokens_create(value, '\t');
-        const char *token = tokens_next(token_state);
+        config_parser config;
 
-        set_btn_config(current, current_state.hotkey_gbtn, "hotkey", token, token_state);
+        memset((void*)&config, '\0', sizeof(config_parser));
 
-        tokens_free(token_state);
+        config.state = CFG_GPTK;
+        config.current_config = root_config;
+        config.config_only = false;
 
-        current = config_create("controls:hotkey");
+        config_ini_handler((void*)&config, "controls", "hotkey", "hold_state hotkey");
 
-        config_overlay_parent(current);
+        config_ini_handler((void*)&config, "controls:hotkey", "overlay", "parent");
 
         for (int i=0; i < gptk_hk_fix_offset; i++)
         {
             char *name = gptk_hk_fix_text[i];
-            value = strchr(gptk_hk_fix_text[i], '=');
+            char *value = strchr(gptk_hk_fix_text[i], '=');
             value++;
 
             // printf("REGESTERING: '%s' = '%s'", name, value);
@@ -1357,27 +1358,38 @@ void config_finalise()
                 // printf(": bad value\n");
                 continue;
             }
+            // printf("\n");
 
             *(value - 4) = '\0';
 
-            // printf(", '%s'", name);
+            config_ini_handler((void*)&config, "controls:hotkey", name, value);
+        }
 
-            const button_match *button = find_button(name);
+        if (env_textinput != NULL && atob_default(env_textinput, true) == true)
+        {
+            config_ini_handler((void*)&config, "controls:hotkey", "down", "push_state text_input");
 
-            if (!button)
+            config_ini_handler((void*)&config, "controls:text_input", "overlay", "clear");
+            config_ini_handler((void*)&config, "controls:text_input", "charset", "full");
+
+            const struct { char *button; char *keybind; } text_input[] = {
+                {"up",   "prev_letter"},
+                {"down", "next_letter"},
+
+                {"right", "add_letter"},
+                {"left",  "remove_letter"},
+
+                {"a",     "add_letter"},
+                {"b",     "remove_letter"},
+
+                {"start", "finish_text"},
+                {"back",  "cancel_text"},
+            };
+
+            for (size_t i=0; i < (sizeof(text_input) / sizeof(text_input[0])); i++)
             {
-                // printf(": bad button\n");
-                continue;
+                config_ini_handler((void*)&config, "controls:text_input", text_input[i].button, text_input[i].keybind);
             }
-
-            int btn = button->gbtn;
-
-            token_state = tokens_create(value, '\t');
-
-            set_btn_config(current, btn, name, value, token_state);
-
-            tokens_free(token_state);
-            // printf("\n");
         }
 
         current = root_config;

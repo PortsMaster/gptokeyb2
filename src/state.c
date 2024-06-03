@@ -475,7 +475,7 @@ void update_button(int btn, bool pressed)
         }
         else if (button->action == ACT_SPECIAL && button->special >= SPC_ADD_LETTER)
         {   // special controls
-
+            printf("%d -> %d -> %d: %d\n", btn, button->action, button->special,(int)input_active());
             switch (button->special)
             {
             case SPC_ADD_LETTER:

@@ -1075,13 +1075,15 @@ void set_btn_config(gptokeyb_config *config, int btn, const char *name, const ch
                     return;
                 }
             }
-            else if (strcmp(token, "\"") == 0)
+            else if (strcmp(token, "\\\"") == 0)
             {
-                GPTK2_DEBUG("# empty key %s, %s = %s\n", token, name, value);
+                // GPTK2_DEBUG("# empty key %s, %s = %s\n", token, name, value);
+                // DO NOTHING
             }
             else
             {
-                GPTK2_DEBUG("# unknown key \"%s\", %s = \"%s\"\n", token, name, value);
+                fprintf(stderr, "warning: unknown key \"%s\" in binding: %s = \"%s\"\n", token, name, value);
+                // GPTK2_DEBUG("# unknown key \"%s\", %s = \"%s\"\n", token, name, value);
             }
         }
 
@@ -1120,22 +1122,22 @@ static int config_ini_handler(
         {
             const char *section_gameprefix = section + 7; // strlen("config:")
 
-            GPTK2_DEBUG("CONFIG++: %s\n", section_gameprefix);
+            // GPTK2_DEBUG("CONFIG++: %s\n", section_gameprefix);
             if (strcasecmp(section_gameprefix, game_prefix) == 0)
             {
                 config->state = CFG_CONFIG;
-                GPTK2_DEBUG("ACCEPT GAME OVERRIDE \"%s\": %s = %s\n", section, name, value);
+                // GPTK2_DEBUG("ACCEPT GAME OVERRIDE \"%s\": %s = %s\n", section, name, value);
             }
             else
             {
-                GPTK2_DEBUG("IGNORE GAME OVERRIDE \"%s\": %s = %s\n", section, name, value);
+                // GPTK2_DEBUG("IGNORE GAME OVERRIDE \"%s\": %s = %s\n", section, name, value);
                 tokens_free(token_state);
                 return 1;
             }
         }
         else if (strcasecmp(section, "controls") == 0)
         {
-            GPTK2_DEBUG("CONTROLS\n");
+            // GPTK2_DEBUG("CONTROLS\n");
             config->state = CFG_CONTROL;
             config->current_config = root_config;
 
@@ -1143,7 +1145,7 @@ static int config_ini_handler(
         }
         else if (strcasestartswith(section, "controls:") == true)
         {
-            GPTK2_DEBUG("CONTROLS++: %s\n", section);
+            // GPTK2_DEBUG("CONTROLS++: %s\n", section);
             config->state = CFG_CONTROL;
             config->current_config = config_create(section);
 
@@ -1151,7 +1153,7 @@ static int config_ini_handler(
         }
         else
         {
-            GPTK2_DEBUG("OTHER %s\n", section);
+            // GPTK2_DEBUG("OTHER %s\n", section);
             config->state = CFG_OTHER;
         }
     }
@@ -1331,43 +1333,50 @@ void config_finalise()
     gptokeyb_config *current = root_config;
     char* env_textinput = SDL_getenv("TEXTINPUTINTERACTIVE");
 
-    if (gptk_hk_can_fix && (gptk_hk_fix_offset > 0 || (env_textinput != NULL && atob_default(env_textinput, true) == true)))
-    {   // if it has only seen a gptk file we can convert <key>_hk automatically.
-        config_parser config;
+    config_parser config;
 
-        memset((void*)&config, '\0', sizeof(config_parser));
+    memset((void*)&config, '\0', sizeof(config_parser));
 
-        config.state = CFG_GPTK;
-        config.current_config = root_config;
-        config.config_only = false;
+    config.state = CFG_GPTK;
+    config.current_config = root_config;
+    config.config_only = false;
 
-        config_ini_handler((void*)&config, "controls", "hotkey", "hold_state hotkey");
+    if (gptk_hk_can_fix)
+    {   // if we have only seen a gptk file we can convert <key>_hk automatically.
+        current->overlay_mode = OVL_CLEAR;
 
-        config_ini_handler((void*)&config, "controls:hotkey", "overlay", "parent");
-
-        for (int i=0; i < gptk_hk_fix_offset; i++)
+        if (gptk_hk_fix_offset > 0)
         {
-            char *name = gptk_hk_fix_text[i];
-            char *value = strchr(gptk_hk_fix_text[i], '=');
-            value++;
+            config_ini_handler((void*)&config, "controls", "hotkey", "hold_state hk_hotkey");
 
-            // printf("REGESTERING: '%s' = '%s'", name, value);
+            config_ini_handler((void*)&config, "controls:hk_hotkey", "overlay", "parent");
 
-            if (value == NULL || strlen(value) == 0)
+            for (int i=0; i < gptk_hk_fix_offset; i++)
             {
-                // printf(": bad value\n");
-                continue;
+                char *name = gptk_hk_fix_text[i];
+                char *value = strchr(gptk_hk_fix_text[i], '=');
+                value++;
+
+                // printf("REGESTERING: '%s' = '%s'", name, value);
+
+                if (value == NULL || strlen(value) == 0)
+                {
+                    // printf(": bad value\n");
+                    continue;
+                }
+                // printf("\n");
+
+                *(value - 4) = '\0';
+
+                config_ini_handler((void*)&config, "controls:hk_hotkey", name, value);
             }
-            // printf("\n");
-
-            *(value - 4) = '\0';
-
-            config_ini_handler((void*)&config, "controls:hotkey", name, value);
         }
 
         if (env_textinput != NULL && atob_default(env_textinput, true) == true)
-        {
-            config_ini_handler((void*)&config, "controls:hotkey", "down", "push_state text_input");
+        {   // if we have only seen a gptk file we enable the old text_input mode.
+            config_ini_handler((void*)&config, "controls", "start", "hold_state hk_start");
+            config_ini_handler((void*)&config, "controls:hk_start", "overlay", "parent");
+            config_ini_handler((void*)&config, "controls:hk_start", "down", "push_state text_input");
 
             config_ini_handler((void*)&config, "controls:text_input", "overlay", "clear");
             config_ini_handler((void*)&config, "controls:text_input", "charset", "full");
@@ -1391,10 +1400,7 @@ void config_finalise()
                 config_ini_handler((void*)&config, "controls:text_input", text_input[i].button, text_input[i].keybind);
             }
         }
-
-        current = root_config;
     }
-
 
     while (current != NULL)
     {

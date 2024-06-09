@@ -239,6 +239,7 @@ int main(int argc, char* argv[])
             fprintf(stderr, "  -d                  - dump config parsed.\n");
             fprintf(stderr, "  -v                  - print version and quit.");
             fprintf(stderr, "\n");
+            return 1;
             break;
 
         default:

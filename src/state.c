@@ -508,6 +508,21 @@ void update_button(int btn, bool pressed)
                     input_prev_word(1);
                 break;
 
+            case SPC_UPPER_CASE:
+                if (input_active())
+                    input_upper_case();
+                break;
+
+            case SPC_LOWER_CASE:
+                if (input_active())
+                    input_lower_case();
+                break;
+
+            case SPC_TOGGLE_CASE:
+                if (input_active())
+                    input_toggle_case();
+                break;
+
             case SPC_ACCEPT_INPUT:
                 if (input_active())
                     input_accept();

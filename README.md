@@ -1,4 +1,4 @@
-# gptokeyb2
+# GamePad TO KeyBoard 2
 
 Gamepad to Keyboard/mouse/xbox360(gamepad) emulator
 
@@ -7,18 +7,32 @@ Gamepad to Keyboard/mouse/xbox360(gamepad) emulator
 - Interactive text entry added by [Robin Duxfield](https://github.com/romadu)
 - Mostly a complete rewrite by [Jacob Smith](https://github.com/kloptops)
 
+## About
+
+`gptokeyb2` is a fairly big rewrite of `gptokeyb`. It uses a finite state machine (FSM) and a better configuration system. The new FSM allows much more complex control schemes, allowing greater possibilities in controlling ports.
+
+Features:
+- multiple controller layouts that can be moved between.
+- customizable text input engine
+
+
+While `gptokeyb2` has a lot more flexibility, it is also backwards compatible with `gptokeyb`, allowing an easy drop in replacement of the older program without any extra work.
+
+
+
+
 ## Build
 
     mkdir build
     cd build
     cmake ..
     cmake --build .
-    strip gptokeyb
+    strip gptokeyb2
 
 ## Usage
 
 ```bash
-gptokeyb2 "program" -c "controls.ini" &
+./gptokeyb2 "program" -c "controls.ini" &
 ./program
 kill -9 $(pidof gptokeyb2)
 ```

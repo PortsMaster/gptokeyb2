@@ -46,6 +46,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <inttypes.h>
 
 #include <linux/input.h>
 #include <linux/uinput.h>
@@ -193,6 +194,10 @@ enum
 
     SPC_NEXT_WORD,
     SPC_PREV_WORD,
+
+    SPC_UPPER_CASE,
+    SPC_LOWER_CASE,
+    SPC_TOGGLE_CASE,
 
     SPC_ACCEPT_INPUT,
     SPC_CANCEL_INPUT,
@@ -475,6 +480,9 @@ void input_prev_letter(int amount);
 void input_next_word(int amount);
 void input_prev_word(int amount);
 
+void input_upper_case();
+void input_lower_case();
+void input_toggle_case();
 
 // state.c
 bool is_pressed(int btn);

@@ -468,7 +468,7 @@ bool process_with_kill(const char *process_name, bool use_sudo)
     {
         // Trim the newline character
         pid_str[strcspn(pid_str, "\n")] = 0;
-        
+
         // Convert string to integer
         int pid = atoi(pid_str);
 

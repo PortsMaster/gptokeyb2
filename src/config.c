@@ -139,6 +139,9 @@ const char *spc_names[] = {
     "prev_letter",
     "next_word",
     "prev_word",
+    "lower_case",
+    "tolower",
+    "toggle_case",
     "finish_text",
     "cancel_text",
 };
@@ -284,8 +287,8 @@ void config_dump()
     // printf("\n");
 
     printf("[config]\n");
-    printf("repeat_delay = %ld\n", current_state.repeat_delay);
-    printf("repeat_rate = %ld\n", current_state.repeat_rate);
+    printf("repeat_delay = %" PRIu64 "\n", current_state.repeat_delay);
+    printf("repeat_rate = %" PRIu64 "\n", current_state.repeat_rate);
     printf("mouse_slow_scale = %d\n", current_state.mouse_slow_scale);
     printf("deadzone_mode = %s\n", deadzone_mode_str(current_state.deadzone_mode));
     printf("deadzone_scale = %d\n", current_state.deadzone_scale);
@@ -823,6 +826,42 @@ void set_btn_config(gptokeyb_config *config, int btn, const char *name, const ch
 
             config->button[btn].action  = ACT_SPECIAL;
             config->button[btn].special = SPC_NEXT_WORD;
+        }
+        else if (strcasecmp(token, "lower_case") == 0)
+        {
+            // Can't set mouse_slow to the special buttons
+            if (btn >= GBTN_MAX)
+            {
+                fprintf(stderr, "error: unable to set %s to %s\n", token, gbtn_names[btn]);
+                return;
+            }
+
+            config->button[btn].action  = ACT_SPECIAL;
+            config->button[btn].special = SPC_LOWER_CASE;
+        }
+        else if (strcasecmp(token, "upper_case") == 0)
+        {
+            // Can't set mouse_slow to the special buttons
+            if (btn >= GBTN_MAX)
+            {
+                fprintf(stderr, "error: unable to set %s to %s\n", token, gbtn_names[btn]);
+                return;
+            }
+
+            config->button[btn].action  = ACT_SPECIAL;
+            config->button[btn].special = SPC_UPPER_CASE;
+        }
+        else if (strcasecmp(token, "toggle_case") == 0)
+        {
+            // Can't set mouse_slow to the special buttons
+            if (btn >= GBTN_MAX)
+            {
+                fprintf(stderr, "error: unable to set %s to %s\n", token, gbtn_names[btn]);
+                return;
+            }
+
+            config->button[btn].action  = ACT_SPECIAL;
+            config->button[btn].special = SPC_TOGGLE_CASE;
         }
         else if (strcasecmp(token, "finish_text") == 0)
         {

@@ -73,11 +73,13 @@ void handleInputEvent(const SDL_Event *event)
             SDL_GameController* controller = SDL_GameControllerOpen(event->cdevice.which);
             if (controller)
             {
+                int controller_fd = interpose_get_fd();
                 const char *name = SDL_GameControllerNameForIndex(event->cdevice.which);
-                printf("Joystick %i has game controller name '%s'\n", 0, name);
+                printf("Joystick %i has game controller name '%s': %d\n", 0, name, controller_fd);
                 if (strcmp(name, XBOX_CONTROLLER_NAME) != 0)
                 {
                     SDL_GameControllerOpen(event->cdevice.which);
+                    controller_add_fd(event->cdevice.which, controller_fd);
                 }
             }
         }
@@ -88,6 +90,7 @@ void handleInputEvent(const SDL_Event *event)
             SDL_GameController* controller = SDL_GameControllerFromInstanceID(event->cdevice.which);
             if (controller)
             {
+                controller_remove_fd(event->cdevice.which);
                 SDL_GameControllerClose(controller);
             }
         }

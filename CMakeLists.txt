@@ -26,10 +26,13 @@ list(APPEND CMAKE_PREFIX_PATH
 find_package(LIBEVDEV REQUIRED)
 find_package(SDL2 REQUIRED)
 
+add_subdirectory(interpose)
+
 include_directories(
-  ${LIBEVDEV_INCLUDE_DIRS}
-  ${SDL2_INCLUDE_DIRS}
-  )
+    interpose
+    ${LIBEVDEV_INCLUDE_DIRS}
+    ${SDL2_INCLUDE_DIRS}
+    )
 
 add_executable(gptokeyb2
     src/analog.c
@@ -49,4 +52,5 @@ target_link_libraries(gptokeyb2
     ${SDL2_LIBRARIES}
     ${LIBEVDEV_LIBRARIES}
     m
+    interpose
     )

@@ -56,6 +56,8 @@
 
 #include <SDL.h>
 
+#include "interpose.h"
+
 #define GPTK2_VERSION "2.00.03"
 
 #define GPTK2_DEBUG_ENABLED
@@ -204,6 +206,14 @@ enum
 };
 
 enum
+{   // Exclusive mode
+    EXL_FALSE,
+    EXL_TRUE,
+
+    EXL_PARENT,
+};
+
+enum
 {   // Overlay mode
     OVL_NONE,
     OVL_PARENT,
@@ -245,6 +255,7 @@ struct _gptokeyb_config
     gptokeyb_config *input_return_map;
 
     int overlay_mode; // one of OVL_NONE / PARENT / CLEAR / NAMED
+    int exclusive_mode;
 
     // one of MOUSE_MOVEMENT_PARENT / OFF / ON
     int left_analog_as_mouse;
@@ -492,6 +503,7 @@ bool was_released(int btn);
 void update_button(int btn, bool pressed);
 
 void state_init();
+void state_quit();
 void state_update();
 gptokeyb_config *state_active();
 
@@ -499,6 +511,12 @@ void push_state(gptokeyb_config *);
 void set_state(gptokeyb_config *);
 void pop_state();
 void state_change_update();
+
+void controllers_enable_exclusive();
+void controllers_disable_exclusive();
+
+void controller_add_fd(Sint32 which, int fd);
+void controller_remove_fd(Sint32 which);
 
 // event.c
 void handleInputEvent(const SDL_Event *event);

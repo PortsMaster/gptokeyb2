@@ -152,6 +152,12 @@ const char *ovl_names[] = {
     "clear",
 };
 
+const char *exl_names[] = {
+    "false",
+    "true",
+    "parent",
+};
+
 int atoi_between(const char *value, int minimum, int maximum, int default_value)
 {
     char *endptr;
@@ -327,6 +333,11 @@ void config_dump()
             need_newline = true;
         }
 
+        if (current->exclusive_mode != EXL_FALSE)
+        {
+            printf("exclusive = %s\n", exl_names[current->exclusive_mode]);
+        }
+
         for (int btn=0; btn < GBTN_MAX; btn++)
         {
             if ((current->dpad_as_mouse != MOUSE_MOVEMENT_OFF && btn == GBTN_DPAD_UP) ||
@@ -447,6 +458,7 @@ void config_overlay_clear(gptokeyb_config *current)
     current->dpad_as_mouse = MOUSE_MOVEMENT_OFF;
     current->left_analog_as_mouse = MOUSE_MOVEMENT_OFF;
     current->right_analog_as_mouse = MOUSE_MOVEMENT_OFF;
+    current->exclusive_mode = EXL_FALSE;
 
     for (int btn=0; btn < GBTN_MAX; btn++)
     {
@@ -464,6 +476,7 @@ void config_overlay_parent(gptokeyb_config *current)
     current->dpad_as_mouse = MOUSE_MOVEMENT_PARENT;
     current->left_analog_as_mouse = MOUSE_MOVEMENT_PARENT;
     current->right_analog_as_mouse = MOUSE_MOVEMENT_PARENT;
+    current->exclusive_mode = EXL_PARENT;
 
     for (int btn=0; btn < GBTN_MAX; btn++)
     {
@@ -497,6 +510,8 @@ void config_overlay_named(gptokeyb_config *current, const char *name)
     current->dpad_as_mouse         = other->dpad_as_mouse;
     current->left_analog_as_mouse  = other->left_analog_as_mouse;
     current->right_analog_as_mouse = other->right_analog_as_mouse;
+
+    current->exclusive_mode        = other->exclusive_mode;
 
     for (int btn=0; btn < GBTN_MAX; btn++)
     {
@@ -1328,6 +1343,17 @@ static int config_ini_handler(
                 config->current_config->wordset = string_register(token);
                 config->current_config->charset = NULL;
             }
+        }
+        else if (strcasecmp(name, "exclusive") == 0)
+        {
+            if (strcasecmp(token, "parent") == 0)
+                config->current_config->exclusive_mode = EXL_PARENT;
+
+            else if (strcasecmp(token, "true") == 0)
+                config->current_config->exclusive_mode = EXL_TRUE;
+
+            else
+                config->current_config->exclusive_mode = EXL_FALSE;
         }
         else
         {

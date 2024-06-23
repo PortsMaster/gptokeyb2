@@ -42,6 +42,17 @@ bool current_dpad_as_mouse = false;
 bool current_left_analog_as_mouse = false;
 bool current_right_analog_as_mouse = false;
 
+bool exclusive_mode = false;
+
+typedef struct _controller_fd
+{
+    struct _controller_fd *next;
+    Sint32 which;
+    int fd;
+} controller_fd;
+
+controller_fd *controller_fds = NULL;
+
 
 void state_init()
 {
@@ -65,6 +76,126 @@ void state_init()
     current_state.deadzone_triggers = 3000;
 
     current_state.dpad_mouse_normalize = true;
+
+    controller_fds = NULL;
+
+    exclusive_mode = false;
+}
+
+void state_quit()
+{
+    controller_fd *current_fd = controller_fds;
+    controller_fd *next_fd = NULL;
+
+    while (current_fd != NULL)
+    {
+        next_fd = current_fd->next;
+
+        if (exclusive_mode)
+        {
+            ioctl(current_fd->fd, EVIOCGRAB, 0);
+        }
+
+        free(current_fd);
+
+        current_fd = next_fd;
+    }
+
+    exclusive_mode = false;
+    controller_fds = NULL;
+}
+
+
+void controller_add_fd(Sint32 which, int fd)
+{
+    controller_fd *new_fd = (controller_fd*)gptk_malloc(sizeof(controller_fd));
+
+    if (exclusive_mode)
+    {
+        // put it in exclusive mode.
+        ioctl(fd, EVIOCGRAB, 1);
+    }
+
+    new_fd->which = which;
+    new_fd->fd = fd;
+
+    new_fd->next = controller_fds;
+
+    controller_fds = new_fd;
+}
+
+
+void controller_remove_fd(Sint32 which)
+{
+    controller_fd *current_fd = controller_fds;
+    controller_fd *prev_fd = NULL;
+
+    while (current_fd != NULL)
+    {
+        if (which == current_fd->which)
+        {
+            if (exclusive_mode)
+            {
+                ioctl(current_fd->fd, EVIOCGRAB, 0);
+            }
+
+            if (prev_fd != NULL)
+            {
+                prev_fd->next = current_fd->next;
+            }
+            else
+            {
+                controller_fds = current_fd->next;
+            }
+
+            free(current_fd);
+
+            return;
+        }
+
+        prev_fd = current_fd;
+        current_fd = current_fd->next;
+    }
+}
+
+
+void controllers_enable_exclusive()
+{
+    controller_fd *current_fd = controller_fds;
+
+    if (exclusive_mode)
+        return;
+
+    fprintf(stderr, "Enable exclusive mode.\n");
+    while (current_fd != NULL)
+    {
+        if (ioctl(current_fd->fd, EVIOCGRAB, 1) == -1)
+            fprintf(stderr, "unable to set exclusive on %d\n", current_fd->fd);
+
+        current_fd = current_fd->next;
+    }
+
+    exclusive_mode = true;
+}
+
+
+void controllers_disable_exclusive()
+{
+    controller_fd *current_fd = controller_fds;
+
+    if (!exclusive_mode)
+        return;
+
+    fprintf(stderr, "Disable exclusive mode.\n");
+    while (current_fd != NULL)
+    {
+        if (ioctl(current_fd->fd, EVIOCGRAB, 0) == -1)
+            fprintf(stderr, "unable to clear exclusive on %d\n", current_fd->fd);
+
+        current_fd = current_fd->next;
+    }
+
+    exclusive_mode = false;
 }
 
 
@@ -245,6 +376,8 @@ void state_change_update()
     bool found_left_analog_as_mouse = false;
     bool found_right_analog_as_mouse = false;
 
+    int change_exclusive_mode = EXL_PARENT;
+
     const char *found_charset = NULL;
     const char *found_wordset = NULL;
 
@@ -261,6 +394,11 @@ void state_change_update()
                 continue;
 
             gptokeyb_config *current = config_temp_stack[sbtn];
+
+            if (change_exclusive_mode == EXL_PARENT && current->exclusive_mode != EXL_PARENT)
+            {
+                change_exclusive_mode = current->exclusive_mode;
+            }
 
             if (NOT_FOUND_INPUT_SETS)
             {
@@ -297,16 +435,21 @@ void state_change_update()
 
     while (current_depth >= 0)
     {
+        gptokeyb_config *current = config_stack[current_depth];
+
+        if (change_exclusive_mode == EXL_PARENT && current->exclusive_mode != EXL_PARENT)
+        {
+            change_exclusive_mode = current->exclusive_mode;
+        }
+
         if (NOT_FOUND_INPUT_SETS)
         {
-            found_charset = config_stack[current_depth]->charset;
-            found_wordset = config_stack[current_depth]->wordset;
+            found_charset = current->charset;
+            found_wordset = current->wordset;
         }
 
         if (NOT_FOUND_DPADS)
         {
-            gptokeyb_config *current = config_stack[current_depth];
-
             if (!found_dpad_as_mouse && current->dpad_as_mouse != MOUSE_MOVEMENT_PARENT)
             {
                 current_dpad_as_mouse = (current->dpad_as_mouse == MOUSE_MOVEMENT_ON);
@@ -341,6 +484,12 @@ void state_change_update()
     {
         input_stop();
     }
+
+    if (change_exclusive_mode == EXL_TRUE)
+        controllers_enable_exclusive();
+
+    else if (change_exclusive_mode == EXL_FALSE)
+        controllers_disable_exclusive();
 
     if (!found_dpad_as_mouse)
         current_dpad_as_mouse = false;

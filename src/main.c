@@ -446,13 +446,13 @@ int main(int argc, char* argv[])
                 mouse_y = (int)((float)(mouse_y) / slow_scale);
             }
 
-            // if (mouse_x != 0 || mouse_y != 0)
-            //     GPTK2_DEBUG("mouse move %d %d\n", mouse_x, mouse_y);
+            if (mouse_x != 0 || mouse_y != 0)
+                GPTK2_DEBUG("mouse move %d %d\n", mouse_x, mouse_y);
 
             emitMouseMotion(mouse_x, mouse_y);
 
             // sleep.
-            SDL_Delay(16);
+            SDL_Delay(current_state.repeat_delay);
         }
         else
         {

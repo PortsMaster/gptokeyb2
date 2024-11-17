@@ -166,7 +166,7 @@ void controllers_enable_exclusive()
     if (exclusive_mode)
         return;
 
-    fprintf(stderr, "Enable exclusive mode.\n");
+    // fprintf(stderr, "Enable exclusive mode.\n");
     while (current_fd != NULL)
     {
         if (ioctl(current_fd->fd, EVIOCGRAB, 1) == -1)
@@ -186,7 +186,7 @@ void controllers_disable_exclusive()
     if (!exclusive_mode)
         return;
 
-    fprintf(stderr, "Disable exclusive mode.\n");
+    // fprintf(stderr, "Disable exclusive mode.\n");
     while (current_fd != NULL)
     {
         if (ioctl(current_fd->fd, EVIOCGRAB, 0) == -1)

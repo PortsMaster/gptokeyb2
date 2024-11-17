@@ -308,6 +308,7 @@ typedef struct
     int hotkey_gbtn;
     bool running;
 
+    Uint64 mouse_delay;
     Uint64 repeat_delay;
     Uint64 repeat_rate;
 } gptokeyb_state;

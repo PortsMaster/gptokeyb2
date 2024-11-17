@@ -9,3 +9,4 @@ add_library(interpose SHARED interpose.c)
 
 # Link with pthread
 target_link_libraries(interpose PRIVATE pthread)
+target_link_libraries(interpose PRIVATE dl)

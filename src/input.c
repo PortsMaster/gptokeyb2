@@ -225,7 +225,7 @@ void input_init()
         characters[(unsigned char)full_set->characters[i]].shift   = (keyinfo->modifier & MOD_SHIFT) != 0;
     }
 
-    for (int i=0; i < MAX_INPUT_LENGTH; i++)
+    for (int i=0; i < MAX_TEXT_LENGTH; i++)
         input_text[i] = 0;
 }
 
@@ -394,7 +394,7 @@ void input_load_char_set(const char *name)
     {   // Clear buffers, setup for new input session.
         do_init = true;
 
-        for (int i=0; i < (MAX_INPUT_LENGTH); i++)
+        for (int i=0; i < MAX_TEXT_LENGTH; i++)
             input_text[i] = 0;
 
         current_offset = 0;
@@ -454,7 +454,7 @@ void input_load_word_set(const char *name)
 {   // load a word set, deactivate any char sets.
     if (!input_active())
     {   // Clear buffers, setup for new input session.
-        for (int i=0; i < (MAX_INPUT_LENGTH+1); i++)
+        for (int i=0; i < MAX_TEXT_LENGTH; i++)
             input_text[i] = 0;
 
         current_offset = 0;

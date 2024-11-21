@@ -644,7 +644,7 @@ void set_cfg_config(const char *name, const char *value, token_ctx *token_state)
         ((void)0);
 
     else if (strcasecmp(name, "controls") == 0)
-        strncpy(default_control_name, value, MAX_CONTROL_NAME);
+        strncpy(default_control_name, value, MAX_CONTROL_NAME - 1);
 
     else if (strcasecmp(name, "charset") == 0)
     {

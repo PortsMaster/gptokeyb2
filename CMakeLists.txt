@@ -1,7 +1,3 @@
-# NOTE:  If you installed SDL2 at an unusual place and FindSDL2 fails,
-#        you can define SDL2_INCLUDE_DIR on the cmdline.  For example:
-#        cmake -DSDL2_INCLUDE_DIR=/opt/SDL2/include/SDL2 [other stuff]
-
 set(CMAKE_SYSTEM_NAME Linux)
 set(CMAKE_SYSTEM_PROCESSOR arm)
 
@@ -12,8 +8,6 @@ set(CMAKE_C_COMPILER_TARGET ${triple})
 set(CMAKE_CXX_COMPILER g++)
 set(CMAKE_CXX_COMPILER_TARGET ${triple})
 
-add_compile_options(-Wall -Wextra -pedantic -Werror)
-
 cmake_minimum_required(VERSION 3.0.0)
 project(gptokeyb
         VERSION 0.2.0
@@ -23,16 +17,15 @@ list(APPEND CMAKE_PREFIX_PATH
     "${CMAKE_CURRENT_LIST_DIR}/cmake/modules"
 )
 
+add_compile_options(-Wall -Wextra -pedantic -Werror)
+
+# NOTE: you can specify custom installation locations of the libraries
+# by setting CMake variables -DSDL_INCLUDE_DIR=... or -DLIBEVDEV_INCLUDE_DIR=...
+# on the command line
 find_package(LIBEVDEV REQUIRED)
 find_package(SDL2 REQUIRED)
 
 add_subdirectory(interpose)
-
-include_directories(
-    interpose
-    ${LIBEVDEV_INCLUDE_DIRS}
-    ${SDL2_INCLUDE_DIRS}
-    )
 
 add_executable(gptokeyb2
     src/analog.c
@@ -48,9 +41,15 @@ add_executable(gptokeyb2
     src/xbox360.c
     )
 
-target_link_libraries(gptokeyb2
-    ${SDL2_LIBRARIES}
-    ${LIBEVDEV_LIBRARIES}
-    m
+target_include_directories(gptokeyb2 PRIVATE
     interpose
-    )
+    ${LIBEVDEV_INCLUDE_DIRS}
+    ${SDL2_INCLUDE_DIRS}
+)
+
+target_link_libraries(gptokeyb2 PRIVATE
+    interpose
+    ${LIBEVDEV_LIBRARIES}
+    ${SDL2_LIBRARIES}
+    m
+)

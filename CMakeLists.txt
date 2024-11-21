@@ -1,13 +1,3 @@
-set(CMAKE_SYSTEM_NAME Linux)
-set(CMAKE_SYSTEM_PROCESSOR arm)
-
-set(triple arm-linux-gnueabihf)
-
-set(CMAKE_C_COMPILER gcc)
-set(CMAKE_C_COMPILER_TARGET ${triple})
-set(CMAKE_CXX_COMPILER g++)
-set(CMAKE_CXX_COMPILER_TARGET ${triple})
-
 cmake_minimum_required(VERSION 3.0.0)
 project(gptokeyb
         VERSION 0.2.0

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.0.0)
+cmake_minimum_required(VERSION 3.10.0)
 project(gptokeyb
         VERSION 0.2.0
         LANGUAGES C)
@@ -34,13 +34,13 @@ add_executable(gptokeyb2
 
 target_include_directories(gptokeyb2 PRIVATE
     interpose
-    ${LIBEVDEV_INCLUDE_DIRS}
+    ${LIBEVDEV_INCLUDE_DIR}
     ${SDL2_INCLUDE_DIRS}
 )
 
 target_link_libraries(gptokeyb2 PRIVATE
     interpose
-    ${LIBEVDEV_LIBRARIES}
+    ${LIBEVDEV_LIBRARY}
     ${SDL2_LIBRARIES}
     m
 )

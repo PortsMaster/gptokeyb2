@@ -23,11 +23,15 @@ While `gptokeyb2` has a lot more flexibility, it is also backwards compatible wi
 
 ## Build
 
-    mkdir build
-    cd build
-    cmake ..
-    cmake --build .
-    strip gptokeyb2
+`gptokeyb2` depends on SDL2 and libevdev. On Debian, you can install them using `apt install libsdl2-dev libevdev-dev`. To build for ARM devices using cross-compilation, you can use one of the provided toolchains in `cmake/toolchains` by adding argument `-DCMAKE_TOOLCHAIN_FILE=<path to toolchain>`. 
+
+```bash
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=[Release/Debug]
+cmake --build .
+strip gptokeyb2
+```
 
 ## Usage
 

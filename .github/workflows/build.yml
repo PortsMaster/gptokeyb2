@@ -1,0 +1,63 @@
+name: gptokeyb2 Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "master" ]
+    paths-ignore:
+      - '**/README.md'
+  pull_request:
+    branches: [ "master" ]
+    paths-ignore:
+      - '**/README.md'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: debian:bullseye
+    name: Debian ${{ matrix.arch.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: 
+          - name: arm64
+            cross: aarch64-linux-gnu
+            executable: aarch64
+          - name: armhf
+            cross: arm-linux-gnueabihf
+            executable: armhf
+
+    steps:
+      - name: Install ${{ matrix.arch.name }} dependencies
+        run: |
+          dpkg --add-architecture ${{ matrix.arch.name }}
+          apt update
+          apt install -y --no-install-recommends python3 git build-essential patchelf linux-libc-dev-${{ matrix.arch.name }}-cross gcc-${{ matrix.arch.cross }} libsdl2-dev:${{ matrix.arch.name }} libevdev-dev:${{ matrix.arch.name }} ca-certificates cmake ninja-build
+
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build ${{ matrix.arch.name }}
+        run: |
+          mkdir build && cd build
+          cmake ../ -GNinja -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/debian-${{ matrix.arch.name }}-gcc-toolchain.cmake -DCMAKE_BUILD_TYPE=Release
+          cmake --build .
+        
+      - name: Prepare export
+        run: |
+          cd build
+          patchelf --replace-needed libinterpose.so libinterpose.${{ matrix.arch.executable }}.so gptokeyb2
+          patchelf --set-soname libinterpose.${{ matrix.arch.executable }}.so lib/libinterpose.so
+          mv lib/libinterpose.so libinterpose.${{ matrix.arch.executable }}.so
+          /usr/${{ matrix.arch.cross }}/bin/strip gptokeyb2
+          mv gptokeyb2 gptokeyb2.${{ matrix.arch.executable }}
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: gptokeyb2_${{ matrix.arch.name }}
+          path: |
+            ${{ github.workspace }}/build/*.${{ matrix.arch.executable }}*
+

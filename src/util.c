@@ -535,7 +535,7 @@ string_reg *string_reg_create(const char *string)
 
     current_string->string = (char *)gptk_malloc(string_len + 1);
 
-    strncpy(current_string->string, string, strlen(string));
+    memcpy(current_string->string, string, string_len + 1);
 
     return current_string;
 }
@@ -580,7 +580,7 @@ const char *string_register(const char *string)
         return NULL;
 
     string_reg *current_string = root_string;
-    string_reg *last_string;
+    string_reg *last_string = NULL;
 
     while (current_string != NULL)
     {

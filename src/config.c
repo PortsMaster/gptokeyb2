@@ -296,7 +296,7 @@ void config_dump()
     printf("repeat_delay = %" PRIu64 "\n", current_state.repeat_delay);
     printf("repeat_rate = %" PRIu64 "\n", current_state.repeat_rate);
     // printf("mouse_scale = %d\n", current_state.mouse_scale);
-    printf("mouse_delay = %d\n", current_state.mouse_slow_scale);
+    printf("mouse_delay = %d\n", current_state.mouse_delay);
     printf("mouse_slow_scale = %d\n", current_state.mouse_slow_scale);
     printf("deadzone_mode = %s\n", deadzone_mode_str(current_state.deadzone_mode));
     printf("deadzone_scale = %d\n", current_state.deadzone_scale);

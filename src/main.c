@@ -452,7 +452,8 @@ int main(int argc, char* argv[])
             emitMouseMotion(mouse_x, mouse_y);
 
             // sleep.
-            SDL_Delay(current_state.repeat_delay);
+            // TODO: FIX ME
+            SDL_Delay(current_state.mouse_delay);
         }
         else
         {

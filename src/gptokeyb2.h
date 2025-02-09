@@ -87,6 +87,9 @@
 // THIS IS REDICULOUS, STOP IT.
 #define CFG_STACK_MAX 16
 
+// This should be tested to find a better value.
+#define DEFAULT_MOUSE_WHEEL_AMOUNT 1
+
 // keyboard mods
 #define MOD_SHIFT 0x01
 #define MOD_CTRL  0x02
@@ -262,6 +265,9 @@ struct _gptokeyb_config
     int right_analog_as_mouse;
     int dpad_as_mouse;
 
+    // Amount to scroll the wheel, 0 means parent amount or default.
+    Uint32 mouse_wheel_amount;
+
     bool map_check;
     gptokeyb_button button[GBTN_MAX];
 };
@@ -373,10 +379,12 @@ extern int config_temp_stack_order_id;
 
 extern gptokeyb_state current_state;
 extern int gptokeyb_config_depth;
+
 // these get filled out as the state changes
 extern bool current_dpad_as_mouse;
 extern bool current_left_analog_as_mouse;
 extern bool current_right_analog_as_mouse;
+extern bool current_mouse_wheel_amount;
 
 // stuff
 extern int uinp_fd;

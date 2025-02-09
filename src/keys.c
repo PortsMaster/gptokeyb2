@@ -42,8 +42,16 @@ const keyboard_values keyboard_codes[] = {
     {"down",        KEY_DOWN,        0},
     {"left",        KEY_LEFT,        0},
     {"right",       KEY_RIGHT,       0},
-    {"mouse_left",  BTN_LEFT,        0},
-    {"mouse_right", BTN_RIGHT,       0},
+
+    {"mouse_left",       BTN_LEFT,      0},
+    {"mouse_middle",     BTN_MIDDLE,    0},
+    {"mouse_right",      BTN_RIGHT,     0},
+    {"mouse_back",       BTN_BACK,      0},
+    {"mouse_forward",    BTN_FORWARD,   0},
+    // hack
+    {"mouse_wheel_up",   BTN_GEAR_UP,   0},
+    {"mouse_wheel_down", BTN_GEAR_DOWN, 0},
+
     {"space",       KEY_SPACE,       0},
     {" ",           KEY_SPACE,       0},
     {"esc",         KEY_ESC,         0},

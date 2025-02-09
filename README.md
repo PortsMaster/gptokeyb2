@@ -55,6 +55,9 @@ deadzone_delay = 16
 # Clear any defaults
 overlay = clear
 
+# Scroll by this amount.
+mouse_wheel_amount = 3
+
 a = mouse_left                          # Mouse Left
 b = mouse_right                         # Mouse Right
 x = s                                   # Stop
@@ -78,10 +81,18 @@ right_analog = arrow_keys repeat
 [controls:hotkey]
 overlay = parent
 
+# We get this from above.
+# mouse_wheel_amount = parent
+
 l1 = n                               # Select next unit
 l2 = e                               # Select everything on screen
 r1 = tab                             # Show/Hide sidebar
 r2 = home                            # Center screen on selection
+
+right_analog_left  = clear
+right_analog_right = clear
+right_analog_up   = mouse_wheel_up repeat
+right_analog_down = mouse_wheel_down repeat
 
 [controls:analog_0]
 # Controls for devices with 0 analog sticks.

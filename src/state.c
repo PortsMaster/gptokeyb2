@@ -41,6 +41,7 @@ gptokeyb_state current_state;
 bool current_dpad_as_mouse = false;
 bool current_left_analog_as_mouse = false;
 bool current_right_analog_as_mouse = false;
+bool current_mouse_wheel_amount = DEFAULT_MOUSE_WHEEL_AMOUNT;
 
 bool exclusive_mode = false;
 
@@ -76,6 +77,8 @@ void state_init()
     current_state.deadzone_triggers = 3000;
 
     current_state.dpad_mouse_normalize = true;
+
+    current_state.mouse_delay  = 16;
 
     controller_fds = NULL;
 
@@ -375,6 +378,7 @@ void state_change_update()
     bool found_dpad_as_mouse = false;
     bool found_left_analog_as_mouse = false;
     bool found_right_analog_as_mouse = false;
+    bool found_mouse_wheel_amount = false;
 
     int change_exclusive_mode = EXL_PARENT;
 
@@ -398,6 +402,12 @@ void state_change_update()
             if (change_exclusive_mode == EXL_PARENT && current->exclusive_mode != EXL_PARENT)
             {
                 change_exclusive_mode = current->exclusive_mode;
+            }
+
+            if (!found_mouse_wheel_amount && current->mouse_wheel_amount > 0)
+            {
+                found_mouse_wheel_amount = true;
+                current_mouse_wheel_amount = current->mouse_wheel_amount;
             }
 
             if (NOT_FOUND_INPUT_SETS)
@@ -440,6 +450,12 @@ void state_change_update()
         if (change_exclusive_mode == EXL_PARENT && current->exclusive_mode != EXL_PARENT)
         {
             change_exclusive_mode = current->exclusive_mode;
+        }
+
+        if (!found_mouse_wheel_amount && current->mouse_wheel_amount > 0)
+        {
+            found_mouse_wheel_amount = true;
+            current_mouse_wheel_amount = current->mouse_wheel_amount;
         }
 
         if (NOT_FOUND_INPUT_SETS)
@@ -490,6 +506,9 @@ void state_change_update()
 
     else if (change_exclusive_mode == EXL_FALSE)
         controllers_disable_exclusive();
+
+    if (!found_mouse_wheel_amount)
+        current_mouse_wheel_amount = DEFAULT_MOUSE_WHEEL_AMOUNT;
 
     if (!found_dpad_as_mouse)
         current_dpad_as_mouse = false;

@@ -237,6 +237,8 @@ void config_init()
 
     gptokeyb_config_depth = 0;
 
+    root_config->mouse_wheel_amount = DEFAULT_MOUSE_WHEEL_AMOUNT;
+
     config_stack[0] = root_config;
 
     for (int i=1; i < CFG_STACK_MAX; i++)
@@ -296,7 +298,7 @@ void config_dump()
     printf("repeat_delay = %" PRIu64 "\n", current_state.repeat_delay);
     printf("repeat_rate = %" PRIu64 "\n", current_state.repeat_rate);
     // printf("mouse_scale = %d\n", current_state.mouse_scale);
-    printf("mouse_delay = %d\n", current_state.mouse_delay);
+    printf("mouse_delay = %" PRIu64 "\n", current_state.mouse_delay);
     printf("mouse_slow_scale = %d\n", current_state.mouse_slow_scale);
     printf("deadzone_mode = %s\n", deadzone_mode_str(current_state.deadzone_mode));
     printf("deadzone_scale = %d\n", current_state.deadzone_scale);
@@ -320,6 +322,16 @@ void config_dump()
         if (current->overlay_mode != OVL_NONE)
         {
             printf("overlay = \"%s\"\n", ovl_names[current->overlay_mode]);
+            need_newline = true;
+        }
+
+        if (current->mouse_wheel_amount != DEFAULT_MOUSE_WHEEL_AMOUNT)
+        {
+            if (current->mouse_wheel_amount > 0)
+                printf("mouse_wheel_amount = %" PRIu32 "\n", current->mouse_wheel_amount);
+            else
+                printf("mouse_wheel_amount = parent\n");
+
             need_newline = true;
         }
 
@@ -461,6 +473,7 @@ void config_overlay_clear(gptokeyb_config *current)
     current->left_analog_as_mouse = MOUSE_MOVEMENT_OFF;
     current->right_analog_as_mouse = MOUSE_MOVEMENT_OFF;
     current->exclusive_mode = EXL_FALSE;
+    current->mouse_wheel_amount = DEFAULT_MOUSE_WHEEL_AMOUNT;
 
     for (int btn=0; btn < GBTN_MAX; btn++)
     {
@@ -479,6 +492,7 @@ void config_overlay_parent(gptokeyb_config *current)
     current->left_analog_as_mouse = MOUSE_MOVEMENT_PARENT;
     current->right_analog_as_mouse = MOUSE_MOVEMENT_PARENT;
     current->exclusive_mode = EXL_PARENT;
+    current->mouse_wheel_amount = 0;
 
     for (int btn=0; btn < GBTN_MAX; btn++)
     {
@@ -514,6 +528,7 @@ void config_overlay_named(gptokeyb_config *current, const char *name)
     current->right_analog_as_mouse = other->right_analog_as_mouse;
 
     current->exclusive_mode        = other->exclusive_mode;
+    current->mouse_wheel_amount    = other->mouse_wheel_amount;
 
     for (int btn=0; btn < GBTN_MAX; btn++)
     {
@@ -638,7 +653,7 @@ void set_cfg_config(const char *name, const char *value, token_ctx *token_state)
         current_state.dpad_mouse_normalize = atob_default(value, true);
 
     else if (strcasecmp(name, "mouse_delay") == 0)
-        ((void)0);
+        current_state.mouse_delay = atoi_between(value, 16, 3000, SDL_DEFAULT_REPEAT_DELAY);
 
     else if (strcasecmp(name, "deadzone_delay") == 0)
         ((void)0);
@@ -1267,6 +1282,13 @@ static int config_ini_handler(
                 // fprintf(stderr, "overlay = (blank)\n");
             }
         }
+        else if (strcasecmp(name, "mouse_wheel_amount") == 0)
+        {
+            if (strcasecmp(token, "parent") == 0)
+                config->current_config->mouse_wheel_amount = 0; // 0 means parent.
+            else
+                config->current_config->mouse_wheel_amount = atoi_between(token, 1, 32, DEFAULT_MOUSE_WHEEL_AMOUNT);
+        }
         else if (strcaseendswith(name, "_hk"))
         {
             char *temp = (char*)gptk_malloc(GPTK_HK_FIX_MAX_LINE);
@@ -1318,6 +1340,13 @@ static int config_ini_handler(
             {
                 // fprintf(stderr, "overlay = (blank)\n");
             }
+        }
+        else if (strcasecmp(name, "mouse_wheel_amount") == 0)
+        {
+            if (strcasecmp(token, "parent") == 0)
+                config->current_config->mouse_wheel_amount = 0; // 0 means parent.
+            else
+                config->current_config->mouse_wheel_amount = atoi_between(token, 1, 32, DEFAULT_MOUSE_WHEEL_AMOUNT);
         }
         else if (strcasecmp(name, "charset") == 0)
         {

@@ -350,8 +350,21 @@ void emitKey(int code, bool pressed, int modifier)
     if ((modifier != 0) && pressed)
         emitModifier(pressed, modifier);
 
-    emit(EV_KEY, code, pressed ? 1 : 0);
-    emit(EV_SYN, SYN_REPORT, 0);
+    if (code == BTN_GEAR_UP)
+    {
+        if (pressed)
+            emitMouseWheel(-current_mouse_wheel_amount);
+    }
+    else if (code == BTN_GEAR_DOWN)
+    {
+        if (pressed)
+            emitMouseWheel(current_mouse_wheel_amount);
+    }
+    else
+    {
+        emit(EV_KEY, code, pressed ? 1 : 0);
+        emit(EV_SYN, SYN_REPORT, 0);
+    }
 
     if ((modifier != 0) && !(pressed))
         emitModifier(pressed, modifier);

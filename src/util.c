@@ -305,7 +305,7 @@ int strncasecmp(const char *s1, const char *s2, size_t n)
 }
 
 
-void emit(int type, int code, int val)
+void emit(int fd, int type, int code, int val)
 {
     struct input_event ev;
 
@@ -316,7 +316,7 @@ void emit(int type, int code, int val)
     ev.time.tv_sec = 0;
     ev.time.tv_usec = 0;
 
-    write(uinp_fd, &ev, sizeof(ev));
+    write(fd, &ev, sizeof(ev));
 }
 
 
@@ -324,25 +324,25 @@ void emitModifier(bool pressed, int modifier)
 {
     if ((modifier & MOD_SHIFT) != 0)
     {
-        emit(EV_KEY, KEY_LEFTSHIFT, pressed ? 1 : 0);
-        emit(EV_SYN, SYN_REPORT, 0);        
+        emit(kb_uinp_fd, EV_KEY, KEY_LEFTSHIFT, pressed ? 1 : 0);
+        emit(kb_uinp_fd, EV_SYN, SYN_REPORT, 0);        
     }
 
     if ((modifier & MOD_ALT) != 0)
     {
-        emit(EV_KEY, KEY_LEFTALT, pressed ? 1 : 0);
-        emit(EV_SYN, SYN_REPORT, 0);        
+        emit(kb_uinp_fd, EV_KEY, KEY_LEFTALT, pressed ? 1 : 0);
+        emit(kb_uinp_fd, EV_SYN, SYN_REPORT, 0);        
     }
 
     if ((modifier & MOD_CTRL) != 0)
     {
-        emit(EV_KEY, KEY_LEFTCTRL, pressed ? 1 : 0);
-        emit(EV_SYN, SYN_REPORT, 0);        
+        emit(kb_uinp_fd, EV_KEY, KEY_LEFTCTRL, pressed ? 1 : 0);
+        emit(kb_uinp_fd, EV_SYN, SYN_REPORT, 0);        
     }
 }
 
 
-void emitKey(int code, bool pressed, int modifier)
+void emitKey(int fd, int code, bool pressed, int modifier)
 {
     if (code == 0)
         return;
@@ -362,8 +362,8 @@ void emitKey(int code, bool pressed, int modifier)
     }
     else
     {
-        emit(EV_KEY, code, pressed ? 1 : 0);
-        emit(EV_SYN, SYN_REPORT, 0);
+        emit(fd, EV_KEY, code, pressed ? 1 : 0);
+        emit(fd, EV_SYN, SYN_REPORT, 0);
     }
 
     if ((modifier != 0) && !(pressed))
@@ -375,43 +375,51 @@ void emitTextInputKey(int code, bool uppercase)
 {
     if (uppercase)
     {   //capitalise capital letters by holding shift
-        emitKey(KEY_LEFTSHIFT, true, 0);
+        emitKey(kb_uinp_fd, KEY_LEFTSHIFT, true, 0);
     }
 
-    emitKey(code, true, 0);
+    emitKey(kb_uinp_fd, code, true, 0);
     SDL_Delay(16);
-    emitKey(code, false, 0);
+    emitKey(kb_uinp_fd, code, false, 0);
     SDL_Delay(16);
 
     if (uppercase)
     {   //release shift if held
-        emitKey(KEY_LEFTSHIFT, false, 0);
+        emitKey(kb_uinp_fd, KEY_LEFTSHIFT, false, 0);
     }
 }
 
 
 void emitAxisMotion(int code, int value)
 {
-    emit(EV_ABS, code, value);
-    emit(EV_SYN, SYN_REPORT, 0);
+    emit(xbox_uinp_fd, EV_ABS, code, value);
+    emit(xbox_uinp_fd, EV_SYN, SYN_REPORT, 0);
 }
 
 
-void emitMouseMotion(int x, int y)
+void emitRelativeMouseMotion(int x, int y)
 {
     if (x != 0)
     {
-        emit(EV_REL, REL_X, x);
+        emit(kb_uinp_fd, EV_REL, REL_X, x);
     }
     if (y != 0)
     {
-        emit(EV_REL, REL_Y, y);
+        emit(kb_uinp_fd, EV_REL, REL_Y, y);
     }
 
     if (x != 0 || y != 0)
     {
-        emit(EV_SYN, SYN_REPORT, 0);
+        emit(kb_uinp_fd, EV_SYN, SYN_REPORT, 0);
     }
+}
+
+void emitAbsoluteMouseMotion(int x, int y)
+{
+    // apparently absolute positioning is 1-indexed
+    emit(abs_uinp_fd, EV_ABS, ABS_X, 1 + x);
+    emit(abs_uinp_fd, EV_ABS, ABS_Y, 1 + y);
+    emit(abs_uinp_fd, EV_SYN, SYN_REPORT, 0);
 }
 
 
@@ -419,24 +427,9 @@ void emitMouseWheel(int wheel)
 {
     if (wheel != 0)
     {
-        emit(EV_REL, REL_WHEEL, wheel);
-        emit(EV_SYN, SYN_REPORT, 0);
+        emit(kb_uinp_fd, EV_REL, REL_WHEEL, wheel);
+        emit(kb_uinp_fd, EV_SYN, SYN_REPORT, 0);
     }
-}
-
-
-void handleAnalogTrigger(bool is_triggered, bool *was_triggered, int key, int modifier)
-{
-    if (is_triggered && !(*was_triggered))
-    {
-        emitKey(key, true, modifier);
-    }
-    else if (!is_triggered && (*was_triggered))
-    {
-        emitKey(key, false, modifier);
-    }
-
-    *was_triggered = is_triggered;
 }
 
 
@@ -515,10 +508,10 @@ bool process_with_kill(const char *process_name, bool use_sudo)
 
 void process_with_pc_quit()
 {
-    emitKey(KEY_F4, true, KEY_LEFTALT);
+    emitKey(kb_uinp_fd, KEY_F4, true, KEY_LEFTALT);
     SDL_Delay(15);
 
-    emitKey(KEY_F4, false, KEY_LEFTALT);
+    emitKey(kb_uinp_fd, KEY_F4, false, KEY_LEFTALT);
     SDL_Delay(15);
 }
 

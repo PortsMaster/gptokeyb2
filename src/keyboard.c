@@ -36,31 +36,138 @@
 */
 
 #include "gptokeyb2.h"
+#include <stdio.h>
+#include <string.h>
 
+// set up absolute mouse movement ioctl incantations
+/* static void setup_abs(int fd, int type, int min, int max, int res) */
+/* { */
+/*     struct uinput_abs_setup abs = { */
+/*         .code = type, */
+/*         .absinfo = { */
+/*             .minimum = min, */
+/*             .maximum = max, */
+/*             .resolution = res */
+/*         } */
+/*     }; */
 
-void setupFakeKeyboardMouseDevice(struct uinput_user_dev *device, int fd)
+/*     if (-1 == ioctl(fd, UI_ABS_SETUP, &abs)) { */
+/*         fprintf(stderr, "Error in ioctl UI_ABS_SETUP\n"); */
+/*         exit(255); */
+/*     } */
+/* } */
+
+void setupFakeAbsoluteMouseDevice()
 {
-    strncpy(device->name, "Fake Keyboard", UINPUT_MAX_NAME_SIZE);
-    device->id.vendor = 0x1234;  /* sample vendor */
-    device->id.product = 0x5678; /* sample product */
+    struct uinput_user_dev device;
+    
+    memset(&device, 0, sizeof(device));
+    strncpy(device.name, "Fake Absolute Mouse", UINPUT_MAX_NAME_SIZE);
+    device.id.vendor = 0x1235;  /* sample vendor */
+    device.id.product = 0x5678; /* sample product */
+    device.id.version = 1;
+    device.id.bustype = BUS_USB;
+
+    int fd = abs_uinp_fd = open("/dev/uinput", O_WRONLY | O_NONBLOCK);
+    if (fd < 0)
+    {
+        fprintf(stderr, "Unable to open /dev/uinput\n");
+        exit(255);
+    }
+
+    // more magical incantations
+    ioctl(fd, UI_SET_EVBIT, EV_SYN);
+    ioctl(fd, UI_SET_EVBIT, EV_KEY);
+    ioctl(fd, UI_SET_KEYBIT, BTN_LEFT);
+    ioctl(fd, UI_SET_EVBIT, EV_ABS);
+    ioctl(fd, UI_SET_ABSBIT, ABS_X);
+    ioctl(fd, UI_SET_ABSBIT, ABS_Y);
+
+    // Fake mouse for absolute positioning
+    ioctl(fd, UI_SET_EVBIT, EV_ABS);
+
+    // magical incantations to the absolute pointer gods.
+    // These with/height/etc are all arbitrary
+    device.absmin[ABS_X] = 0;
+    device.absmax[ABS_X] = 1280;
+    device.absfuzz[ABS_X] = 4;
+    device.absflat[ABS_X] = 8;
+
+    device.absmin[ABS_Y] = 0;
+    device.absmax[ABS_Y] = 1024;
+    device.absfuzz[ABS_Y] = 4;
+    device.absflat[ABS_Y] = 8;
+
+    // Create input device into input sub-system.  UI_DEV_SETUP is too new for arkos
+    // kernel so we just write it to the fd
+    
+    //if (-1 == ioctl(fd, UI_DEV_SETUP, device)) {
+    if (-1 == write(fd, &device, sizeof(device))) {
+        fprintf(stderr, "Unable to setup abs mouse device structure: %s\n", strerror(errno));
+        exit(255);
+    }
+
+    if (ioctl(fd, UI_DEV_CREATE)) {
+        printf("Unable to create abs mouse UINPUT device.\n");
+        exit(-1);
+    }
+}
+
+void setupFakeKeyboardMouseDevice()
+{
+    struct uinput_user_dev device;
+    
+    memset(&device, 0, sizeof(device));
+    strncpy(device.name, "Fake Keyboard Mouse", UINPUT_MAX_NAME_SIZE);
+    device.id.vendor = 0x1234;  /* sample vendor */
+    device.id.product = 0x5678; /* sample product */
+    device.id.version = 1;
+    device.id.bustype = BUS_USB;
+
+    int fd = kb_uinp_fd = open("/dev/uinput", O_WRONLY | O_NONBLOCK);
+    if (fd < 0)
+    {
+        printf("Unable to open /dev/uinput\n");
+        exit(255);
+    }
 
     for (int i = 0; i < 256; i++)
     {
         ioctl(fd, UI_SET_KEYBIT, i);
     }
 
-    // Keys or Buttons
-    ioctl(fd, UI_SET_EVBIT, EV_KEY);
-    ioctl(fd, UI_SET_EVBIT, EV_SYN);
+    if (
+        // Keys or Buttons
+        ioctl(fd, UI_SET_EVBIT, EV_SYN) ||
+        ioctl(fd, UI_SET_EVBIT, EV_KEY) ||
 
-    // Fake mouse
-    ioctl(fd, UI_SET_EVBIT, EV_REL);
-    ioctl(fd, UI_SET_RELBIT, REL_X);
-    ioctl(fd, UI_SET_RELBIT, REL_Y);
-    ioctl(fd, UI_SET_KEYBIT, BTN_LEFT);
-    ioctl(fd, UI_SET_KEYBIT, BTN_RIGHT);
-    // FUCKING SCHROLL WHEEL
-    ioctl(fd, UI_SET_RELBIT, REL_WHEEL);
+        // Fake mouse for both absolute and relative positioning
+        ioctl(fd, UI_SET_EVBIT, EV_REL) ||
+        ioctl(fd, UI_SET_RELBIT, REL_X) ||
+        ioctl(fd, UI_SET_RELBIT, REL_Y) ||
+        ioctl(fd, UI_SET_KEYBIT, BTN_LEFT) ||
+        ioctl(fd, UI_SET_KEYBIT, BTN_RIGHT) ||
+        // FUCKING SCHROLL WHEEL
+        ioctl(fd, UI_SET_RELBIT, REL_WHEEL)
+        ) {
+        fprintf(stderr, "One of the keyboard/mouse ioctls failed: %s\n", strerror(errno));
+        exit(255);
+    }
+
+    //Create input device into input sub-system
+    //if (-1 == ioctl(fd, UI_DEV_SETUP, device)) {
+    if (-1 == write(fd, &device, sizeof(device))) {
+        fprintf(stderr, "Unable to setup mouse/keyboard device structure: %s\n", strerror(errno));
+        exit(255);
+    }
+
+    fsync(fd);
+
+    int ret = ioctl(fd, UI_DEV_CREATE);
+    if (-1 == ret) {
+        fprintf(stderr, "Unable to create keyboard UINPUT device: %d - %s\n", ret, strerror(errno));
+        exit(255);
+    }
 }
 
 
@@ -180,7 +287,7 @@ void handleEventAxisFakeKeyboardMouseDevice(const SDL_Event *event)
     if (current_left_analog_as_mouse && left_axis_movement)
     {
         deadzone_mouse_calc(
-            &current_state.mouse_x, &current_state.mouse_y,
+            &current_state.mouse_relative_x, &current_state.mouse_relative_y,
             current_state.current_left_analog_x, current_state.current_left_analog_y);
 
         // GPTK2_DEBUG("fake mouse %d %d\n", current_state.mouse_x, current_state.mouse_y);
@@ -189,10 +296,24 @@ void handleEventAxisFakeKeyboardMouseDevice(const SDL_Event *event)
     else if (current_right_analog_as_mouse && right_axis_movement)
     {
         deadzone_mouse_calc(
-            &current_state.mouse_x, &current_state.mouse_y,
+            &current_state.mouse_relative_x, &current_state.mouse_relative_y,
             current_state.current_right_analog_x, current_state.current_right_analog_y);
 
         // GPTK2_DEBUG("fake mouse %d %d\n", current_state.mouse_x, current_state.mouse_y);
+    }
+    else if (current_left_analog_as_absolute_mouse && left_axis_movement)
+    {
+        current_state.mouse_absolute_x = current_state.current_left_analog_x;
+        current_state.mouse_absolute_y = current_state.current_left_analog_y;
+
+        GPTK2_DEBUG("fake absolute mouse %d %d\n", current_state.mouse_absolute_x, current_state.mouse_absolute_y);
+    }
+    else if (current_right_analog_as_absolute_mouse && right_axis_movement)
+    {
+        current_state.mouse_absolute_x = current_state.current_right_analog_x;
+        current_state.mouse_absolute_y = current_state.current_right_analog_y;
+
+        GPTK2_DEBUG("fake absolute mouse %d %d\n", current_state.mouse_absolute_x, current_state.mouse_absolute_y);
     }
     else
     {

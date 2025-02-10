@@ -306,6 +306,9 @@ void config_dump()
     printf("deadzone_y = %d\n", current_state.deadzone_y);
     printf("deadzone_triggers = %d\n", current_state.deadzone_triggers);
     printf("dpad_mouse_normalize = %s\n", (current_state.dpad_mouse_normalize ? "true" : "false" ));
+    printf("absolute_center_x = %d\n", current_state.absolute_center_x);
+    printf("absolute_center_y = %d\n", current_state.absolute_center_y);
+    printf("absolute_step = %d\n", current_state.absolute_step);
 
     dump_word_sets();
     dump_char_sets();
@@ -375,6 +378,47 @@ void config_dump()
                 {
                     gbnt_name = "right_analog";
                     gbnt_mode = ((current->right_analog_as_mouse == MOUSE_MOVEMENT_ON) ? "mouse_movement" : "parent");
+                }
+
+                if (strcmp(gbnt_mode, "parent") == 0 && current->overlay_mode == OVL_PARENT)
+                {
+                    btn += 3;
+                    continue;
+                }
+
+                if (need_newline)
+                {
+                    printf("\n");
+                    need_newline = false;
+                }
+
+                printf("%s = %s\n", gbnt_name, gbnt_mode);
+                need_newline = true;
+                btn += 3;
+                continue;
+            }
+
+            if ((current->dpad_as_absolute_mouse != MOUSE_MOVEMENT_OFF && btn == GBTN_DPAD_UP) ||
+                (current->left_analog_as_absolute_mouse != MOUSE_MOVEMENT_OFF && btn == GBTN_LEFT_ANALOG_UP) ||
+                (current->right_analog_as_absolute_mouse != MOUSE_MOVEMENT_OFF && btn == GBTN_RIGHT_ANALOG_UP))
+            {
+                char *gbnt_name;
+                char *gbnt_mode;
+
+                if (btn == GBTN_DPAD_UP)
+                {
+                    gbnt_name = "dpad";
+                    gbnt_mode = ((current->dpad_as_absolute_mouse == MOUSE_MOVEMENT_ON) ? "mouse_absolute" : "parent");
+                }
+                else if (btn == GBTN_LEFT_ANALOG_UP)
+                {
+                    gbnt_name = "left_analog";
+                    gbnt_mode = ((current->left_analog_as_absolute_mouse == MOUSE_MOVEMENT_ON) ? "mouse_absolute" : "parent");
+                }
+                else if (btn == GBTN_RIGHT_ANALOG_UP)
+                {
+                    gbnt_name = "right_analog";
+                    gbnt_mode = ((current->right_analog_as_absolute_mouse == MOUSE_MOVEMENT_ON) ? "mouse_absolute" : "parent");
                 }
 
                 if (strcmp(gbnt_mode, "parent") == 0 && current->overlay_mode == OVL_PARENT)
@@ -472,6 +516,9 @@ void config_overlay_clear(gptokeyb_config *current)
     current->dpad_as_mouse = MOUSE_MOVEMENT_OFF;
     current->left_analog_as_mouse = MOUSE_MOVEMENT_OFF;
     current->right_analog_as_mouse = MOUSE_MOVEMENT_OFF;
+    current->dpad_as_absolute_mouse = MOUSE_MOVEMENT_OFF;
+    current->left_analog_as_absolute_mouse = MOUSE_MOVEMENT_OFF;
+    current->right_analog_as_absolute_mouse = MOUSE_MOVEMENT_OFF;
     current->exclusive_mode = EXL_FALSE;
     current->mouse_wheel_amount = DEFAULT_MOUSE_WHEEL_AMOUNT;
 
@@ -491,6 +538,9 @@ void config_overlay_parent(gptokeyb_config *current)
     current->dpad_as_mouse = MOUSE_MOVEMENT_PARENT;
     current->left_analog_as_mouse = MOUSE_MOVEMENT_PARENT;
     current->right_analog_as_mouse = MOUSE_MOVEMENT_PARENT;
+    current->dpad_as_absolute_mouse = MOUSE_MOVEMENT_PARENT;
+    current->left_analog_as_absolute_mouse = MOUSE_MOVEMENT_PARENT;
+    current->right_analog_as_absolute_mouse = MOUSE_MOVEMENT_PARENT;
     current->exclusive_mode = EXL_PARENT;
     current->mouse_wheel_amount = 0;
 
@@ -634,6 +684,15 @@ void set_cfg_config(const char *name, const char *value, token_ctx *token_state)
     else if (strcasecmp(name, "deadzone_scale") == 0)
         current_state.deadzone_scale = atoi_between(value, 1, 32768, 512);
 
+    else if (strcasecmp(name, "absolute_center_x") == 0)
+        current_state.absolute_center_x = atoi_between(value, 1, 7680, 320);
+
+    else if (strcasecmp(name, "absolute_center_y") == 0)
+        current_state.absolute_center_y = atoi_between(value, 1, 4320, 240);
+
+    else if (strcasecmp(name, "absolute_step") == 0)
+        current_state.absolute_step = atoi_between(value, 1, 7680, 100);
+
     else if (strcasecmp(name, "mouse_scale") == 0)
         current_state.deadzone_scale = atoi_between(value, 1, 32768, 512);
 
@@ -748,6 +807,18 @@ static inline void set_btn_as_mouse(int btn, gptokeyb_config *config, int mode)
 
     else if (GBTN_IS_RIGHT_ANALOG(btn) || btn == GBTN_RIGHT_ANALOG)
         config->right_analog_as_mouse = mode;
+}
+
+static inline void set_btn_as_absolute_mouse(int btn, gptokeyb_config *config, int mode)
+{
+    if (GBTN_IS_DPAD(btn) || btn == GBTN_DPAD)
+        config->dpad_as_absolute_mouse = mode;
+
+    else if (GBTN_IS_LEFT_ANALOG(btn) || btn == GBTN_LEFT_ANALOG)
+        config->left_analog_as_absolute_mouse = mode;
+
+    else if (GBTN_IS_RIGHT_ANALOG(btn) || btn == GBTN_RIGHT_ANALOG)
+        config->right_analog_as_absolute_mouse = mode;
 }
 
 
@@ -1126,6 +1197,25 @@ void set_btn_config(gptokeyb_config *config, int btn, const char *name, const ch
                     return;
                 }
             }
+            else if (strcasecmp(token, "mouse_absolute") == 0)
+            {
+                if (btn >= GBTN_MAX)
+                {
+                    set_btn_as_absolute_mouse(btn, config, MOUSE_MOVEMENT_ON);
+
+                    for (int sbtn=special_button_min(btn), i=0; sbtn < special_button_max(btn); sbtn++, i++)
+                    {
+                        config->button[sbtn].keycode = 0;
+                        config->button[sbtn].action  = ACT_NONE;
+                        config->button[sbtn].special = SPC_NONE;
+                    }
+                }
+                else
+                {
+                    fprintf(stderr, "error: unable to set %s to %s\n", token, gbtn_names[btn]);
+                    return;
+                }
+            }
             else if (strcasecmp(token, "arrow_keys") == 0)
             {
                 if (btn >= GBTN_MAX)
@@ -1253,6 +1343,28 @@ static int config_ini_handler(
                 {
                     name = "right_analog";
                     token = "mouse_movement";
+                    button = find_button(name);
+                }
+            }
+
+            if (strcasestartswith(token, "mouse_absolute_"))
+            {
+                if (GBTN_IS_DPAD(button->gbtn))
+                {
+                    name = "dpad";
+                    token = "mouse_absolute";
+                    button = find_button(name);
+                }
+                else if (GBTN_IS_LEFT_ANALOG(button->gbtn))
+                {
+                    name = "left_analog";
+                    token = "mouse_absolute";
+                    button = find_button(name);
+                }
+                else if (GBTN_IS_RIGHT_ANALOG(button->gbtn))
+                {
+                    name = "right_analog";
+                    token = "mouse_absolute";
                     button = find_button(name);
                 }
             }

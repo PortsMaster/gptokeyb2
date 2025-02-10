@@ -6,25 +6,22 @@
 #  EVDEV_LIBRARY       - library path for libevdev
 #
 
-find_package(PkgConfig)
-pkg_check_modules(LIBEVDEV libevdev>=1.0)
-
-SET(LIBEVDEV_SEARCH_PATHS
+SET(EVDEV_SEARCH_PATHS
     /usr/local
     /usr
+    /
 )
 
-FIND_PATH(LIBEVDEV_INCLUDE_DIR libevdev.h
+FIND_PATH(LIBEVDEV_INCLUDE_DIR libevdev/libevdev.h
     HINTS $ENV{EVDEVDIR}
-    PATH_SUFFIXES include/libevdev-1.0/libevdev include/libevdev
+    PATH_SUFFIXES include/libevdev-1.0 include
     PATHS ${EVDEV_SEARCH_PATHS}
 )
 
 FIND_LIBRARY(LIBEVDEV_LIBRARY
     NAMES libevdev.a evdev
-    HINTS
-    $ENV{EVDEVDIR}
-    PATH_SUFFIXES ${PATH_SUFFIXES}
+    HINTS $ENV{EVDEVDIR}
+    PATH_SUFFIXES lib lib64
     PATHS ${EVDEV_SEARCH_PATHS}
 )
 

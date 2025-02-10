@@ -190,7 +190,7 @@ int main(int argc, char* argv[])
             break;
 
         case 'g':
-            strncpy(game_prefix, optarg, MAX_PROCESS_NAME);
+            strncpy(game_prefix, optarg, MAX_PROCESS_NAME - 1);
             break;
 
         case 'c':
@@ -256,7 +256,7 @@ int main(int argc, char* argv[])
     {
         if (i == 0)
         {
-            strncpy(kill_process_name, argv[index], MAX_PROCESS_NAME);
+            strncpy(kill_process_name, argv[index], MAX_PROCESS_NAME - 1);
 
             if (strlen(game_prefix) == 0 && strlen(kill_process_name) > 0)
             {

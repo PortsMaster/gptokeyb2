@@ -39,24 +39,6 @@
 #include <stdio.h>
 #include <string.h>
 
-// set up absolute mouse movement ioctl incantations
-/* static void setup_abs(int fd, int type, int min, int max, int res) */
-/* { */
-/*     struct uinput_abs_setup abs = { */
-/*         .code = type, */
-/*         .absinfo = { */
-/*             .minimum = min, */
-/*             .maximum = max, */
-/*             .resolution = res */
-/*         } */
-/*     }; */
-
-/*     if (-1 == ioctl(fd, UI_ABS_SETUP, &abs)) { */
-/*         fprintf(stderr, "Error in ioctl UI_ABS_SETUP\n"); */
-/*         exit(255); */
-/*     } */
-/* } */
-
 void setupFakeAbsoluteMouseDevice()
 {
     struct uinput_user_dev device;
@@ -87,7 +69,7 @@ void setupFakeAbsoluteMouseDevice()
     ioctl(fd, UI_SET_EVBIT, EV_ABS);
 
     // magical incantations to the absolute pointer gods.
-    // These with/height/etc are all arbitrary
+    // These (width/height/etc) are all arbitrary
     device.absmin[ABS_X] = 0;
     device.absmax[ABS_X] = 1280;
     device.absfuzz[ABS_X] = 4;

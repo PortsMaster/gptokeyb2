@@ -431,11 +431,9 @@ void input_load_char_set(const char *name)
         char *temp = strchr(active_char_set->characters, input_text[current_offset]);
 
         if (temp == NULL)
-        {
-            current_letter = (int)(temp - active_char_set->characters);
-        }
-        else
             current_letter = 0;
+        else
+            current_letter = (int)(temp - active_char_set->characters);
 
         input_text[current_offset] = active_char_set->characters[current_letter];
 
@@ -601,7 +599,6 @@ void input_cancel()
     printf("input_cancel\n");
 
     input_clear_state();
-    emitTextInputKey(KEY_ENTER, false);
     pop_state();
 }
 

@@ -973,7 +973,7 @@ void set_btn_config(gptokeyb_config *config, int btn, const char *name, const ch
             }
 
             set_btn_as_mouse(btn, config, MOUSE_MOVEMENT_OFF);
-            config->button[btn].action = ACT_STATE_PUSH;
+            config->button[btn].action = ACT_STATE_SET;
             config->button[btn].cfg_name = string_register(token);
             config->map_check = true;
         }

@@ -599,7 +599,6 @@ void input_cancel()
     printf("input_cancel\n");
 
     input_clear_state();
-    emitTextInputKey(KEY_ENTER, false);
     pop_state();
 }
 

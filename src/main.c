@@ -36,6 +36,8 @@
 */
 
 #include "gptokeyb2.h"
+#include <linux/uinput.h>
+#include <stdbool.h>
 
 #define MAX_PROCESS_NAME 64
 
@@ -43,7 +45,11 @@
 #define MAX_PATH 1024
 #endif
 
-int uinp_fd=0;
+// ioctls prevent these from being on the same fd
+int xbox_uinp_fd = 0; // fake xbox controller
+int kb_uinp_fd = 0;  // fake relative mouse and keyboard
+int abs_uinp_fd = 0; // fake absolute position mouse
+
 bool xbox360_mode=false;
 bool config_mode=false;
 
@@ -59,7 +65,6 @@ char kill_process_name[MAX_PROCESS_NAME] = "";
 
 gptokeyb_config *default_config=NULL;
 
-struct uinput_user_dev uidev;
 
 
 int main(int argc, char* argv[])
@@ -70,6 +75,10 @@ int main(int argc, char* argv[])
     state_init();
     config_init();
     input_init();
+
+    xbox_uinp_fd = 0;
+    kb_uinp_fd = 0;
+    abs_uinp_fd = 0;
 
     char* env_home = SDL_getenv("HOME");
     if (env_home)
@@ -358,44 +367,28 @@ int main(int argc, char* argv[])
         return -1;
     }
 
-    // Create fake input device (not needed in kill mode)
-    //if (!kill_mode) {
+    // Create fake input devices
     if (config_mode || xbox360_mode)
-    {   // initialise device, even in kill mode, now that kill mode will work with config & xbox modes
-        uinp_fd = open("/dev/uinput", O_WRONLY | O_NONBLOCK);
-
-        if (uinp_fd < 0)
-        {
-            printf("Unable to open /dev/uinput\n");
-            return -1;
-        }
-
-        // Intialize the uInput device to NULL
-        memset(&uidev, 0, sizeof(uidev));
-        uidev.id.version = 1;
-        uidev.id.bustype = BUS_USB;
+    {
+        // fake keyboard and mouse for any key input (and maybe mouse input)
+        setupFakeKeyboardMouseDevice();
 
         if (xbox360_mode)
         {
+            // seperately setup the fake xbox controller
             printf("Running in Fake Xbox 360 Mode\n");
-            setupFakeXbox360Device(&uidev, uinp_fd);
+            setupFakeXbox360Device();
 
-            // make sure :D
+            // disable the fake mouse overlay configs
             config_overlay_clear(root_config);
         }
         else
         {
+            // or setup the absolute position mouse just in case
             printf("Running in Fake Keyboard mode\n");
-            setupFakeKeyboardMouseDevice(&uidev, uinp_fd);
+            setupFakeAbsoluteMouseDevice();
         }
 
-        // Create input device into input sub-system
-        write(uinp_fd, &uidev, sizeof(uidev));
-
-        if (ioctl(uinp_fd, UI_DEV_CREATE)) {
-            printf("Unable to create UINPUT device.");
-            return -1;
-        }
     }
 
     const char* db_file = SDL_getenv("SDL_GAMECONTROLLERCONFIG_FILE");
@@ -407,6 +400,7 @@ int main(int argc, char* argv[])
     SDL_Event event;
     int mouse_x=0;
     int mouse_y=0;
+    bool mouse_moved=false;
     vector2d mouse_move;
     float slow_scale = (100.0 / (float)(current_state.mouse_slow_scale));
 
@@ -417,12 +411,18 @@ int main(int argc, char* argv[])
             handleInputEvent(&event);
         }
 
+        mouse_x=0;
+        mouse_y=0;
+        mouse_moved = false;
+
         state_update();
 
-        if (current_state.mouse_x != 0 || current_state.mouse_y != 0 || current_dpad_as_mouse || current_state.in_repeat)
+        if (current_state.mouse_relative_x != 0 ||
+            current_state.mouse_relative_y != 0 ||
+            current_dpad_as_mouse)
         {
-            mouse_x = current_state.mouse_x;
-            mouse_y = current_state.mouse_y;
+            mouse_x = current_state.mouse_relative_x;
+            mouse_y = current_state.mouse_relative_y;
 
             if (current_dpad_as_mouse > 0)
             {
@@ -446,17 +446,44 @@ int main(int argc, char* argv[])
                 mouse_y = (int)((float)(mouse_y) / slow_scale);
             }
 
-            if (mouse_x != 0 || mouse_y != 0)
-                GPTK2_DEBUG("mouse move %d %d\n", mouse_x, mouse_y);
+            emitRelativeMouseMotion(mouse_x, mouse_y);
 
-            emitMouseMotion(mouse_x, mouse_y);
+            if (mouse_x != 0 || mouse_y != 0) {
+                mouse_moved=true;
+                GPTK2_DEBUG("relative mouse move %d %d\n", mouse_x, mouse_y);
+            }
+        }
 
+        if (current_state.mouse_absolute_x != 0 || current_state.mouse_absolute_y != 0 || current_dpad_as_absolute_mouse)
+        {
+            mouse_x = current_state.absolute_center_x + (current_state.absolute_step * current_state.mouse_absolute_x / INT16_MAX);
+            mouse_y = current_state.absolute_center_y + (current_state.absolute_step * current_state.mouse_absolute_y / INT16_MAX);
+
+            if (current_dpad_as_absolute_mouse > 0)
+            {
+                if (is_pressed(GBTN_DPAD_LEFT))
+                    mouse_x = current_state.absolute_center_x - current_state.absolute_step;
+                if (is_pressed(GBTN_DPAD_RIGHT))
+                    mouse_x = current_state.absolute_center_x + current_state.absolute_step;
+                if (is_pressed(GBTN_DPAD_UP))
+                    mouse_y = current_state.absolute_center_y - current_state.absolute_step;
+                if (is_pressed(GBTN_DPAD_DOWN))
+                    mouse_y = current_state.absolute_center_y - current_state.absolute_step;
+            }
+
+            if (mouse_x != current_state.absolute_center_x || mouse_y != current_state.absolute_center_y) {
+                GPTK2_DEBUG("absolute mouse move to %d %d\n", mouse_x, mouse_y);
+                emitAbsoluteMouseMotion(mouse_x, mouse_y);
+                mouse_moved=true;
+            }
+        }
+
+        if (mouse_moved) {
             // sleep.
             // TODO: FIX ME
             SDL_Delay(current_state.mouse_delay);
         }
-        else
-        {
+        else {
             // GPTK2_DEBUG("-- WAIT FOR EVENT --\n");
             if (!SDL_WaitEvent(&event))
             {
@@ -471,14 +498,24 @@ int main(int argc, char* argv[])
     SDL_Quit();
 
     /*
-        * Give userspace some time to read the events before we destroy the
-        * device with UI_DEV_DESTROY.
-        */
+     * Give userspace some time to read the events before we destroy the
+     * device with UI_DEV_DESTROY.
+     */
     sleep(1);
 
     /* Clean up */
-    ioctl(uinp_fd, UI_DEV_DESTROY);
-    close(uinp_fd);
+    if (kb_uinp_fd) {
+        ioctl(kb_uinp_fd, UI_DEV_DESTROY);
+        close(kb_uinp_fd);
+    }
+    if (xbox_uinp_fd) {
+        ioctl(xbox_uinp_fd, UI_DEV_DESTROY);
+        close(xbox_uinp_fd);
+    }
+    if (abs_uinp_fd) {
+        ioctl(abs_uinp_fd, UI_DEV_DESTROY);
+        close(abs_uinp_fd);
+    }
 
     config_quit();
     state_quit();

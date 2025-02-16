@@ -41,6 +41,9 @@ gptokeyb_state current_state;
 bool current_dpad_as_mouse = false;
 bool current_left_analog_as_mouse = false;
 bool current_right_analog_as_mouse = false;
+bool current_dpad_as_absolute_mouse = false;
+bool current_left_analog_as_absolute_mouse = false;
+bool current_right_analog_as_absolute_mouse = false;
 bool current_mouse_wheel_amount = DEFAULT_MOUSE_WHEEL_AMOUNT;
 
 bool exclusive_mode = false;
@@ -360,10 +363,11 @@ void state_update()
         current_state.next_repeat[btn] = (current_ticks + current_state.repeat_rate);
     }
 
+    // We don't need to rest absolute values only relative movement
     if (!current_left_analog_as_mouse && !current_right_analog_as_mouse)
     {
-        current_state.mouse_x = 0;
-        current_state.mouse_x = 0;
+        current_state.mouse_relative_x = 0;
+        current_state.mouse_relative_y = 0;
     }
 }
 
@@ -371,13 +375,16 @@ void state_update()
 void state_change_update()
 {   // check as mouse_move and input set stuff.
 
-    #define NOT_FOUND_DPADS (!found_dpad_as_mouse || !found_left_analog_as_mouse || !found_right_analog_as_mouse)
+    #define NOT_FOUND_DPADS (!found_dpad_as_mouse || !found_left_analog_as_mouse || !found_right_analog_as_mouse || !found_left_analog_as_absolute_mouse || !found_right_analog_as_mouse)
 
     #define NOT_FOUND_INPUT_SETS ((found_charset == NULL) && (found_wordset == NULL))
 
     bool found_dpad_as_mouse = false;
     bool found_left_analog_as_mouse = false;
     bool found_right_analog_as_mouse = false;
+    bool found_dpad_as_absolute_mouse = false;
+    bool found_left_analog_as_absolute_mouse = false;
+    bool found_right_analog_as_absolute_mouse = false;
     bool found_mouse_wheel_amount = false;
 
     int change_exclusive_mode = EXL_PARENT;
@@ -418,6 +425,7 @@ void state_change_update()
 
             if (NOT_FOUND_DPADS)
             {
+                // relative positioning
                 if (!found_dpad_as_mouse && current->dpad_as_mouse != MOUSE_MOVEMENT_PARENT)
                 {
                     current_dpad_as_mouse = (current->dpad_as_mouse == MOUSE_MOVEMENT_ON);
@@ -434,6 +442,25 @@ void state_change_update()
                 {
                     current_right_analog_as_mouse = (current->right_analog_as_mouse == MOUSE_MOVEMENT_ON);
                     found_right_analog_as_mouse = true;
+                }
+
+                // absolute positioning
+                if (!found_dpad_as_absolute_mouse && current->dpad_as_absolute_mouse != MOUSE_MOVEMENT_PARENT)
+                {
+                    current_dpad_as_absolute_mouse = (current->dpad_as_absolute_mouse == MOUSE_MOVEMENT_ON);
+                    found_dpad_as_absolute_mouse = true;
+                }
+
+                if (!found_left_analog_as_absolute_mouse && current->left_analog_as_absolute_mouse != MOUSE_MOVEMENT_PARENT)
+                {
+                    current_left_analog_as_absolute_mouse = (current->left_analog_as_absolute_mouse == MOUSE_MOVEMENT_ON);
+                    found_left_analog_as_absolute_mouse = true;
+                }
+
+                if (!found_right_analog_as_absolute_mouse && current->right_analog_as_absolute_mouse != MOUSE_MOVEMENT_PARENT)
+                {
+                    current_right_analog_as_absolute_mouse = (current->right_analog_as_absolute_mouse == MOUSE_MOVEMENT_ON);
+                    found_right_analog_as_absolute_mouse = true;
                 }
             }
         }
@@ -466,6 +493,7 @@ void state_change_update()
 
         if (NOT_FOUND_DPADS)
         {
+            // relative positioning
             if (!found_dpad_as_mouse && current->dpad_as_mouse != MOUSE_MOVEMENT_PARENT)
             {
                 current_dpad_as_mouse = (current->dpad_as_mouse == MOUSE_MOVEMENT_ON);
@@ -482,6 +510,25 @@ void state_change_update()
             {
                 current_right_analog_as_mouse = (current->right_analog_as_mouse == MOUSE_MOVEMENT_ON);
                 found_right_analog_as_mouse = true;
+            }
+
+            // absolute positioning
+            if (!found_dpad_as_absolute_mouse && current->dpad_as_absolute_mouse != MOUSE_MOVEMENT_PARENT)
+            {
+                current_dpad_as_absolute_mouse = (current->dpad_as_absolute_mouse == MOUSE_MOVEMENT_ON);
+                found_dpad_as_absolute_mouse = true;
+            }
+
+            if (!found_left_analog_as_absolute_mouse && current->left_analog_as_absolute_mouse != MOUSE_MOVEMENT_PARENT)
+            {
+                current_left_analog_as_absolute_mouse = (current->left_analog_as_absolute_mouse == MOUSE_MOVEMENT_ON);
+                found_left_analog_as_absolute_mouse = true;
+            }
+
+            if (!found_right_analog_as_absolute_mouse && current->right_analog_as_absolute_mouse != MOUSE_MOVEMENT_PARENT)
+            {
+                current_right_analog_as_absolute_mouse = (current->right_analog_as_absolute_mouse == MOUSE_MOVEMENT_ON);
+                found_right_analog_as_absolute_mouse = true;
             }
         }
 
@@ -518,6 +565,15 @@ void state_change_update()
 
     if (!found_right_analog_as_mouse)
         current_right_analog_as_mouse = false;
+
+    if (!found_dpad_as_absolute_mouse)
+        current_dpad_as_absolute_mouse = false;
+
+    if (!found_left_analog_as_absolute_mouse)
+        current_left_analog_as_absolute_mouse = false;
+
+    if (!found_right_analog_as_absolute_mouse)
+        current_right_analog_as_absolute_mouse = false;
 }
 
 
@@ -585,7 +641,7 @@ void update_button(int btn, bool pressed)
 
     if (was_pressed(btn))
     {
-        // GPTK2_DEBUG("%s -> %s\n", gbtn_names[btn], (pressed ? "pressed" : "released"));
+        GPTK2_DEBUG("%s -> %s\n", gbtn_names[btn], (pressed ? "pressed" : "released"));
 
         if ((current_state.in_repeat & btn_mask) != 0)
         {   // if we're in repeat we get the held button.
@@ -628,7 +684,7 @@ void update_button(int btn, bool pressed)
             if (button->keycode != 0)
             {
                 GPTK2_DEBUG("PRESSED '%s' -> '%s'\n", gbtn_names[btn], find_keycode(button->keycode));
-                emitKey(button->keycode, true, button->modifier);
+                emitKey(kb_uinp_fd, button->keycode, true, button->modifier);
 
                 if (button->repeat && !(current_state.in_repeat & btn_mask))
                 {
@@ -718,7 +774,7 @@ void update_button(int btn, bool pressed)
         if (button->keycode != 0)
         {
             GPTK2_DEBUG("PRESSED '%s' -> '%s'\n", gbtn_names[btn], find_keycode(button->keycode));
-            emitKey(button->keycode, true, button->modifier);
+            emitKey(kb_uinp_fd, button->keycode, true, button->modifier);
         }
     }
     else if (was_released(btn))
@@ -748,7 +804,7 @@ void update_button(int btn, bool pressed)
         if (button->keycode != 0)
         {
             GPTK2_DEBUG("RELEASE '%s' -> '%s'\n", gbtn_names[btn], find_keycode(button->keycode));
-            emitKey(button->keycode, false, button->modifier);
+            emitKey(kb_uinp_fd, button->keycode, false, button->modifier);
         }
     }
 }

@@ -51,11 +51,23 @@ void UINPUT_SET_ABS_P(
     dev->absflat[axis] = flat;
 }
 
-void setupFakeXbox360Device(struct uinput_user_dev *device, int fd)
+void setupFakeXbox360Device()
 {
-    strncpy(device->name, XBOX_CONTROLLER_NAME, UINPUT_MAX_NAME_SIZE);
-    device->id.vendor = 0x045e;  /* sample vendor */
-    device->id.product = 0x028e; /* sample product */
+    struct uinput_user_dev device;
+    
+    memset(&device, 0, sizeof(device));
+    strncpy(device.name, XBOX_CONTROLLER_NAME, UINPUT_MAX_NAME_SIZE);
+    device.id.vendor = 0x045e;  /* sample vendor */
+    device.id.product = 0x028e; /* sample product */
+    device.id.version = 1;
+    device.id.bustype = BUS_USB;
+
+    int fd = xbox_uinp_fd = open("/dev/uinput", O_WRONLY | O_NONBLOCK);
+    if (fd < 0)
+    {
+        printf("Unable to open /dev/uinput\n");
+        exit(255);
+    }
 
     if (
             ioctl(fd, UI_SET_EVBIT, EV_KEY) || ioctl(fd, UI_SET_EVBIT, EV_SYN) ||
@@ -81,14 +93,24 @@ void setupFakeXbox360Device(struct uinput_user_dev *device, int fd)
         exit(-1);
     }
 
-    UINPUT_SET_ABS_P(device, ABS_X, -32768, 32767, 16, 128);
-    UINPUT_SET_ABS_P(device, ABS_Y, -32768, 32767, 16, 128);
-    UINPUT_SET_ABS_P(device, ABS_RX, -32768, 32767, 16, 128);
-    UINPUT_SET_ABS_P(device, ABS_RY, -32768, 32767, 16, 128);
-    UINPUT_SET_ABS_P(device, ABS_HAT0X, -1, 1, 0, 0);
-    UINPUT_SET_ABS_P(device, ABS_HAT0Y, -1, 1, 0, 0);
-    UINPUT_SET_ABS_P(device, ABS_Z, 0, 255, 0, 0);
-    UINPUT_SET_ABS_P(device, ABS_RZ, 0, 255, 0, 0);
+    UINPUT_SET_ABS_P(&device, ABS_X, -32768, 32767, 16, 128);
+    UINPUT_SET_ABS_P(&device, ABS_Y, -32768, 32767, 16, 128);
+    UINPUT_SET_ABS_P(&device, ABS_RX, -32768, 32767, 16, 128);
+    UINPUT_SET_ABS_P(&device, ABS_RY, -32768, 32767, 16, 128);
+    UINPUT_SET_ABS_P(&device, ABS_HAT0X, -1, 1, 0, 0);
+    UINPUT_SET_ABS_P(&device, ABS_HAT0Y, -1, 1, 0, 0);
+    UINPUT_SET_ABS_P(&device, ABS_Z, 0, 255, 0, 0);
+    UINPUT_SET_ABS_P(&device, ABS_RZ, 0, 255, 0, 0);
+
+    if (-1 == ioctl(fd, UI_DEV_SETUP, device)) {
+        fprintf(stderr, "ioctl UI_DEV_SETUP");
+        exit(255);
+    }
+
+    if (ioctl(fd, UI_DEV_CREATE)) {
+        printf("Unable to create UINPUT device.");
+        exit(-1);
+    }
 }
 
 
@@ -97,47 +119,47 @@ void handleEventBtnFakeXbox360Device(const SDL_Event *event, bool is_pressed)
     // Fake Xbox360 mode
     switch (event->cbutton.button) {
     case SDL_CONTROLLER_BUTTON_A:
-        emitKey(BTN_A, is_pressed, 0);
+        emitKey(xbox_uinp_fd, BTN_A, is_pressed, 0);
         break;
 
     case SDL_CONTROLLER_BUTTON_B:
-        emitKey(BTN_B, is_pressed, 0);
+        emitKey(xbox_uinp_fd, BTN_B, is_pressed, 0);
         break;
 
     case SDL_CONTROLLER_BUTTON_X:
-        emitKey(BTN_X, is_pressed, 0);
+        emitKey(xbox_uinp_fd, BTN_X, is_pressed, 0);
         break;
 
     case SDL_CONTROLLER_BUTTON_Y:
-        emitKey(BTN_Y, is_pressed, 0);
+        emitKey(xbox_uinp_fd, BTN_Y, is_pressed, 0);
         break;
 
     case SDL_CONTROLLER_BUTTON_LEFTSHOULDER:
-        emitKey(BTN_TL, is_pressed, 0);
+        emitKey(xbox_uinp_fd, BTN_TL, is_pressed, 0);
         break;
 
     case SDL_CONTROLLER_BUTTON_RIGHTSHOULDER:
-        emitKey(BTN_TR, is_pressed, 0);
+        emitKey(xbox_uinp_fd, BTN_TR, is_pressed, 0);
         break;
 
     case SDL_CONTROLLER_BUTTON_LEFTSTICK:
-        emitKey(BTN_THUMBL, is_pressed, 0);
+        emitKey(xbox_uinp_fd, BTN_THUMBL, is_pressed, 0);
         break;
 
     case SDL_CONTROLLER_BUTTON_RIGHTSTICK:
-        emitKey(BTN_THUMBR, is_pressed, 0);
+        emitKey(xbox_uinp_fd, BTN_THUMBR, is_pressed, 0);
         break;
 
     case SDL_CONTROLLER_BUTTON_BACK: // aka select
-        emitKey(BTN_SELECT, is_pressed, 0);
+        emitKey(xbox_uinp_fd, BTN_SELECT, is_pressed, 0);
         break;
 
     case SDL_CONTROLLER_BUTTON_GUIDE:
-        emitKey(BTN_MODE, is_pressed, 0);
+        emitKey(xbox_uinp_fd, BTN_MODE, is_pressed, 0);
         break;
 
     case SDL_CONTROLLER_BUTTON_START:
-        emitKey(BTN_START, is_pressed, 0);
+        emitKey(xbox_uinp_fd, BTN_START, is_pressed, 0);
         break;
 
     case SDL_CONTROLLER_BUTTON_DPAD_UP:

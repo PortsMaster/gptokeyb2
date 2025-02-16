@@ -265,6 +265,11 @@ struct _gptokeyb_config
     int right_analog_as_mouse;
     int dpad_as_mouse;
 
+    // same as above but using absolute positional values
+    int left_analog_as_absolute_mouse;
+    int right_analog_as_absolute_mouse;
+    int dpad_as_absolute_mouse;
+
     // Amount to scroll the wheel, 0 means parent amount or default.
     Uint32 mouse_wheel_amount;
 
@@ -297,8 +302,14 @@ typedef struct
     int current_l2;
     int current_r2;
 
-    int mouse_x;
-    int mouse_y;
+    int mouse_relative_x;
+    int mouse_relative_y;
+
+    int absolute_center_x;
+    int absolute_center_y;
+    int absolute_step;
+    int mouse_absolute_x;
+    int mouse_absolute_y;
 
     int dpad_mouse_step;
     int mouse_slow_scale;
@@ -385,9 +396,16 @@ extern bool current_dpad_as_mouse;
 extern bool current_left_analog_as_mouse;
 extern bool current_right_analog_as_mouse;
 extern bool current_mouse_wheel_amount;
+extern bool current_dpad_as_absolute_mouse;
+extern bool current_left_analog_as_absolute_mouse;
+extern bool current_right_analog_as_absolute_mouse;
+
+// fds for emulated devices
+extern int xbox_uinp_fd; // fake xbox controller
+extern int kb_uinp_fd;   // fake relative mouse and keyboard
+extern int abs_uinp_fd;  // fake absolute position mouse
 
 // stuff
-extern int uinp_fd;
 extern bool xbox360_mode;
 extern bool config_mode;
 
@@ -458,12 +476,13 @@ void string_quit();
 const char *string_register(const char *string);
 
 // from og gptokeyb
-void emit(int type, int code, int val);
-void emitMouseMotion(int x, int y);
+void emit(int fd, int type, int code, int val);
+void emitRelativeMouseMotion(int x, int y);
+void emitAbsoluteMouseMotion(int x, int y);
 void emitMouseWheel(int wheel);
 void emitAxisMotion(int code, int value);
 void emitTextInputKey(int code, bool uppercase);
-void emitKey(int code, bool is_pressed, int modifier);
+void emitKey(int fd, int code, bool is_pressed, int modifier);
 void handleAnalogTrigger(bool is_triggered, bool *was_triggered, int key, int modifier);
 
 // input.c
@@ -531,12 +550,13 @@ void controller_remove_fd(Sint32 which);
 void handleInputEvent(const SDL_Event *event);
 
 // keyboard.c
-void setupFakeKeyboardMouseDevice(struct uinput_user_dev *device, int fd);
+void setupFakeKeyboardMouseDevice();
+void setupFakeAbsoluteMouseDevice();
 void handleEventBtnFakeKeyboardMouseDevice(const SDL_Event *event, bool is_pressed);
 void handleEventAxisFakeKeyboardMouseDevice(const SDL_Event *event);
 
 // xbox360.c
-void setupFakeXbox360Device(struct uinput_user_dev *device, int fd);
+void setupFakeXbox360Device();
 void handleEventBtnFakeXbox360Device(const SDL_Event *event, bool is_pressed);
 void handleEventAxisFakeXbox360Device(const SDL_Event *event);
 

@@ -41,7 +41,6 @@ gptokeyb_state current_state;
 bool current_dpad_as_mouse = false;
 bool current_left_analog_as_mouse = false;
 bool current_right_analog_as_mouse = false;
-bool current_dpad_as_absolute_mouse = false;
 bool current_left_analog_as_absolute_mouse = false;
 bool current_right_analog_as_absolute_mouse = false;
 bool current_mouse_wheel_amount = DEFAULT_MOUSE_WHEEL_AMOUNT;
@@ -382,7 +381,6 @@ void state_change_update()
     bool found_dpad_as_mouse = false;
     bool found_left_analog_as_mouse = false;
     bool found_right_analog_as_mouse = false;
-    bool found_dpad_as_absolute_mouse = false;
     bool found_left_analog_as_absolute_mouse = false;
     bool found_right_analog_as_absolute_mouse = false;
     bool found_mouse_wheel_amount = false;
@@ -442,13 +440,6 @@ void state_change_update()
                 {
                     current_right_analog_as_mouse = (current->right_analog_as_mouse == MOUSE_MOVEMENT_ON);
                     found_right_analog_as_mouse = true;
-                }
-
-                // absolute positioning
-                if (!found_dpad_as_absolute_mouse && current->dpad_as_absolute_mouse != MOUSE_MOVEMENT_PARENT)
-                {
-                    current_dpad_as_absolute_mouse = (current->dpad_as_absolute_mouse == MOUSE_MOVEMENT_ON);
-                    found_dpad_as_absolute_mouse = true;
                 }
 
                 if (!found_left_analog_as_absolute_mouse && current->left_analog_as_absolute_mouse != MOUSE_MOVEMENT_PARENT)
@@ -512,13 +503,6 @@ void state_change_update()
                 found_right_analog_as_mouse = true;
             }
 
-            // absolute positioning
-            if (!found_dpad_as_absolute_mouse && current->dpad_as_absolute_mouse != MOUSE_MOVEMENT_PARENT)
-            {
-                current_dpad_as_absolute_mouse = (current->dpad_as_absolute_mouse == MOUSE_MOVEMENT_ON);
-                found_dpad_as_absolute_mouse = true;
-            }
-
             if (!found_left_analog_as_absolute_mouse && current->left_analog_as_absolute_mouse != MOUSE_MOVEMENT_PARENT)
             {
                 current_left_analog_as_absolute_mouse = (current->left_analog_as_absolute_mouse == MOUSE_MOVEMENT_ON);
@@ -565,9 +549,6 @@ void state_change_update()
 
     if (!found_right_analog_as_mouse)
         current_right_analog_as_mouse = false;
-
-    if (!found_dpad_as_absolute_mouse)
-        current_dpad_as_absolute_mouse = false;
 
     if (!found_left_analog_as_absolute_mouse)
         current_left_analog_as_absolute_mouse = false;

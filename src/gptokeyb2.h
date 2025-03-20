@@ -268,7 +268,6 @@ struct _gptokeyb_config
     // same as above but using absolute positional values
     int left_analog_as_absolute_mouse;
     int right_analog_as_absolute_mouse;
-    int dpad_as_absolute_mouse;
 
     // Amount to scroll the wheel, 0 means parent amount or default.
     Uint32 mouse_wheel_amount;
@@ -305,9 +304,13 @@ typedef struct
     int mouse_relative_x;
     int mouse_relative_y;
 
+    bool absolute_invert_x;
+    bool absolute_invert_y;
     int absolute_center_x;
     int absolute_center_y;
     int absolute_step;
+    int absolute_deadzone;
+    int absolute_rotate;
     int mouse_absolute_x;
     int mouse_absolute_y;
 
@@ -396,7 +399,6 @@ extern bool current_dpad_as_mouse;
 extern bool current_left_analog_as_mouse;
 extern bool current_right_analog_as_mouse;
 extern bool current_mouse_wheel_amount;
-extern bool current_dpad_as_absolute_mouse;
 extern bool current_left_analog_as_absolute_mouse;
 extern bool current_right_analog_as_absolute_mouse;
 

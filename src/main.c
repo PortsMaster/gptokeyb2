@@ -454,25 +454,28 @@ int main(int argc, char* argv[])
             }
         }
 
-        if (current_state.mouse_absolute_x != 0 || current_state.mouse_absolute_y != 0 || current_dpad_as_absolute_mouse)
+        if (current_state.mouse_absolute_x != 0 || current_state.mouse_absolute_y != 0)
         {
-            mouse_x = current_state.absolute_center_x + (current_state.absolute_step * current_state.mouse_absolute_x / INT16_MAX);
-            mouse_y = current_state.absolute_center_y + (current_state.absolute_step * current_state.mouse_absolute_y / INT16_MAX);
-
-            if (current_dpad_as_absolute_mouse > 0)
-            {
-                if (is_pressed(GBTN_DPAD_LEFT))
-                    mouse_x = current_state.absolute_center_x - current_state.absolute_step;
-                if (is_pressed(GBTN_DPAD_RIGHT))
-                    mouse_x = current_state.absolute_center_x + current_state.absolute_step;
-                if (is_pressed(GBTN_DPAD_UP))
-                    mouse_y = current_state.absolute_center_y - current_state.absolute_step;
-                if (is_pressed(GBTN_DPAD_DOWN))
-                    mouse_y = current_state.absolute_center_y - current_state.absolute_step;
-            }
-
-            if (mouse_x != current_state.absolute_center_x || mouse_y != current_state.absolute_center_y) {
-                GPTK2_DEBUG("absolute mouse move to %d %d\n", mouse_x, mouse_y);
+            if (abs(mouse_x - current_state.absolute_center_x) > current_state.absolute_deadzone ||
+                abs(mouse_y - current_state.absolute_center_y) > current_state.absolute_deadzone) {
+                
+                if (current_state.absolute_rotate == 90) {
+                    mouse_x = current_state.absolute_center_x + (current_state.absolute_step * -current_state.mouse_absolute_y / INT16_MAX);
+                    mouse_y = current_state.absolute_center_y + (current_state.absolute_step * current_state.mouse_absolute_x / INT16_MAX);
+                }
+                else if (current_state.absolute_rotate == 180) { 
+                    mouse_x = current_state.absolute_center_x + (current_state.absolute_step * -current_state.mouse_absolute_x / INT16_MAX);
+                    mouse_y = current_state.absolute_center_y + (current_state.absolute_step * -current_state.mouse_absolute_y / INT16_MAX);
+                }
+                else if (current_state.absolute_rotate == 270) {
+                    mouse_x = current_state.absolute_center_x + (current_state.absolute_step * current_state.mouse_absolute_y / INT16_MAX);
+                    mouse_y = current_state.absolute_center_y + (current_state.absolute_step * -current_state.mouse_absolute_x / INT16_MAX);
+                }
+                else {
+                    mouse_x = current_state.absolute_center_x + (current_state.absolute_step * current_state.mouse_absolute_x / INT16_MAX);
+                    mouse_y = current_state.absolute_center_y + (current_state.absolute_step * current_state.mouse_absolute_y / INT16_MAX);
+                }
+                
                 emitAbsoluteMouseMotion(mouse_x, mouse_y);
                 mouse_moved=true;
             }

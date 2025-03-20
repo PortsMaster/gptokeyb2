@@ -456,25 +456,25 @@ int main(int argc, char* argv[])
 
         if (current_state.mouse_absolute_x != 0 || current_state.mouse_absolute_y != 0)
         {
+            if (current_state.absolute_rotate == 90) {
+                mouse_x = current_state.absolute_center_x + (current_state.absolute_step * -current_state.mouse_absolute_y / INT16_MAX);
+                mouse_y = current_state.absolute_center_y + (current_state.absolute_step * current_state.mouse_absolute_x / INT16_MAX);
+            }
+            else if (current_state.absolute_rotate == 180) { 
+                mouse_x = current_state.absolute_center_x + (current_state.absolute_step * -current_state.mouse_absolute_x / INT16_MAX);
+                mouse_y = current_state.absolute_center_y + (current_state.absolute_step * -current_state.mouse_absolute_y / INT16_MAX);
+            }
+            else if (current_state.absolute_rotate == 270) {
+                mouse_x = current_state.absolute_center_x + (current_state.absolute_step * current_state.mouse_absolute_y / INT16_MAX);
+                mouse_y = current_state.absolute_center_y + (current_state.absolute_step * -current_state.mouse_absolute_x / INT16_MAX);
+            }
+            else {
+                mouse_x = current_state.absolute_center_x + (current_state.absolute_step * current_state.mouse_absolute_x / INT16_MAX);
+                mouse_y = current_state.absolute_center_y + (current_state.absolute_step * current_state.mouse_absolute_y / INT16_MAX);
+            }
+            
             if (abs(mouse_x - current_state.absolute_center_x) > current_state.absolute_deadzone ||
                 abs(mouse_y - current_state.absolute_center_y) > current_state.absolute_deadzone) {
-                
-                if (current_state.absolute_rotate == 90) {
-                    mouse_x = current_state.absolute_center_x + (current_state.absolute_step * -current_state.mouse_absolute_y / INT16_MAX);
-                    mouse_y = current_state.absolute_center_y + (current_state.absolute_step * current_state.mouse_absolute_x / INT16_MAX);
-                }
-                else if (current_state.absolute_rotate == 180) { 
-                    mouse_x = current_state.absolute_center_x + (current_state.absolute_step * -current_state.mouse_absolute_x / INT16_MAX);
-                    mouse_y = current_state.absolute_center_y + (current_state.absolute_step * -current_state.mouse_absolute_y / INT16_MAX);
-                }
-                else if (current_state.absolute_rotate == 270) {
-                    mouse_x = current_state.absolute_center_x + (current_state.absolute_step * current_state.mouse_absolute_y / INT16_MAX);
-                    mouse_y = current_state.absolute_center_y + (current_state.absolute_step * -current_state.mouse_absolute_x / INT16_MAX);
-                }
-                else {
-                    mouse_x = current_state.absolute_center_x + (current_state.absolute_step * current_state.mouse_absolute_x / INT16_MAX);
-                    mouse_y = current_state.absolute_center_y + (current_state.absolute_step * current_state.mouse_absolute_y / INT16_MAX);
-                }
                 
                 emitAbsoluteMouseMotion(mouse_x, mouse_y);
                 mouse_moved=true;

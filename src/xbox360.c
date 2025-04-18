@@ -102,10 +102,7 @@ void setupFakeXbox360Device()
     UINPUT_SET_ABS_P(&device, ABS_Z, 0, 255, 0, 0);
     UINPUT_SET_ABS_P(&device, ABS_RZ, 0, 255, 0, 0);
 
-    if (-1 == ioctl(fd, UI_DEV_SETUP, device)) {
-        fprintf(stderr, "ioctl UI_DEV_SETUP");
-        exit(255);
-    }
+    write(fd, &device, sizeof(device));
 
     if (ioctl(fd, UI_DEV_CREATE)) {
         printf("Unable to create UINPUT device.");

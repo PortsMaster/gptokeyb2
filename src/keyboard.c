@@ -288,14 +288,14 @@ void handleEventAxisFakeKeyboardMouseDevice(const SDL_Event *event)
         current_state.mouse_absolute_x = current_state.current_left_analog_x;
         current_state.mouse_absolute_y = current_state.current_left_analog_y;
 
-        GPTK2_DEBUG("fake absolute mouse %d %d\n", current_state.mouse_absolute_x, current_state.mouse_absolute_y);
+        //GPTK2_DEBUG("fake absolute mouse %d %d\n", current_state.mouse_absolute_x, current_state.mouse_absolute_y);
     }
     else if (current_right_analog_as_absolute_mouse && right_axis_movement)
     {
         current_state.mouse_absolute_x = current_state.current_right_analog_x;
         current_state.mouse_absolute_y = current_state.current_right_analog_y;
 
-        GPTK2_DEBUG("fake absolute mouse %d %d\n", current_state.mouse_absolute_x, current_state.mouse_absolute_y);
+        //GPTK2_DEBUG("fake absolute mouse %d %d\n", current_state.mouse_absolute_x, current_state.mouse_absolute_y);
     }
     else
     {

@@ -98,6 +98,17 @@ right_analog_right = clear
 right_analog_up   = mouse_wheel_up repeat
 right_analog_down = mouse_wheel_down repeat
 
+left_analog = absolute_mouse_movement
+# how many pixels of deflection before we move the pointer
+absolute_deadzone = 3
+# default is zero but set to some other angle if you have a rotated screen
+absolute_rotate = 0
+# we hardcode a 1280x960 screen here so 640x480 is dead center
+absolute_center_x = 640
+absolute_center_y = 510
+# how many pixels is maximum deflection
+absolute_step = 350
+
 [controls:analog_0]
 # Controls for devices with 0 analog sticks.
 overlay = controls

@@ -82,6 +82,15 @@ void state_init()
 
     current_state.mouse_delay  = 16;
 
+    // Absolute mouse defaults
+    // Screen defaults to 640x480, config values are in virtual 1280x1024 space
+    current_state.absolute_screen_width = 640;
+    current_state.absolute_screen_height = 480;
+    current_state.absolute_center_x = 640;   // center of virtual 1280 width
+    current_state.absolute_center_y = 512;   // center of virtual 1024 height
+    current_state.absolute_step = 350;
+    current_state.absolute_deadzone = 3;
+
     controller_fds = NULL;
 
     exclusive_mode = false;

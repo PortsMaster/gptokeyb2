@@ -208,7 +208,7 @@ void input_init()
     size_t character_len = strlen(full_set->characters);
     const keyboard_values *keyinfo;
     memset((void*)characters, '\0', sizeof(characters));
-    char find_buff[3] = "\0\0\0";
+    char find_buff[3] = {0};
 
     for (size_t i = 0; i < character_len; i++)
     {

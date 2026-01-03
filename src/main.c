@@ -90,6 +90,22 @@ int main(int argc, char* argv[])
         strncpy(user_config_file, "~/.config/gptokeyb2.ini", MAX_PATH);
     }
 
+    // Read display dimensions from environment for absolute mouse
+    // Note: center_x/y and step are in virtual 1280x1024 space (from config)
+    // screen_width/height are actual display dimensions (for scaling)
+    char* env_display_width = SDL_getenv("DISPLAY_WIDTH");
+    char* env_display_height = SDL_getenv("DISPLAY_HEIGHT");
+    if (env_display_width && env_display_height)
+    {
+        int width = atoi(env_display_width);
+        int height = atoi(env_display_height);
+        if (width > 0 && height > 0)
+        {
+            current_state.absolute_screen_width = width;
+            current_state.absolute_screen_height = height;
+        }
+    }
+
     // Add hotkey environment variable if available
     char* env_hotkey = SDL_getenv("HOTKEY");
     if (env_hotkey)

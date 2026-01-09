@@ -691,6 +691,12 @@ void set_cfg_config(const char *name, const char *value, token_ctx *token_state)
     else if (strcasecmp(name, "absolute_rotate") == 0)
         current_state.absolute_rotate = atoi_between(value, 0, 271, 0);
 
+    else if (strcasecmp(name, "absolute_screen_width") == 0)
+        current_state.absolute_screen_width = atoi_between(value, 1, 7680, 1920);
+
+    else if (strcasecmp(name, "absolute_screen_height") == 0)
+        current_state.absolute_screen_height = atoi_between(value, 1, 4320, 1080);
+
     else if (strcasecmp(name, "mouse_scale") == 0)
         current_state.deadzone_scale = atoi_between(value, 1, 32768, 512);
 

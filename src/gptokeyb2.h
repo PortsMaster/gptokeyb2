@@ -311,6 +311,8 @@ typedef struct
     int absolute_step;
     int absolute_deadzone;
     int absolute_rotate;
+    int absolute_screen_width;
+    int absolute_screen_height;
     int mouse_absolute_x;
     int mouse_absolute_y;
 

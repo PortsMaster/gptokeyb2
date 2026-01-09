@@ -416,9 +416,34 @@ void emitRelativeMouseMotion(int x, int y)
 
 void emitAbsoluteMouseMotion(int x, int y)
 {
-    // apparently absolute positioning is 1-indexed
-    emit(abs_uinp_fd, EV_ABS, ABS_X, 1 + x);
-    emit(abs_uinp_fd, EV_ABS, ABS_Y, 1 + y);
+    static int last_sent_x = -1, last_sent_y = -1;
+
+    // Scale from virtual 1280x1024 coordinate space to actual screen dimensions
+    // This maintains backwards compatibility with existing configs
+    int scaled_x = (x * current_state.absolute_screen_width) / 1280;
+    int scaled_y = (y * current_state.absolute_screen_height) / 1024;
+
+    // Clamp to screen bounds
+    if (scaled_x < 0) scaled_x = 0;
+    if (scaled_x > current_state.absolute_screen_width) scaled_x = current_state.absolute_screen_width;
+    if (scaled_y < 0) scaled_y = 0;
+    if (scaled_y > current_state.absolute_screen_height) scaled_y = current_state.absolute_screen_height;
+
+    // Force values to always differ from last sent value
+    // The kernel filters duplicate ABS values, which breaks apps that
+    // expect both axes in every event
+    if (scaled_x == last_sent_x) {
+        scaled_x += (scaled_x < current_state.absolute_screen_width) ? 1 : -1;
+    }
+    if (scaled_y == last_sent_y) {
+        scaled_y += (scaled_y < current_state.absolute_screen_height) ? 1 : -1;
+    }
+
+    last_sent_x = scaled_x;
+    last_sent_y = scaled_y;
+
+    emit(abs_uinp_fd, EV_ABS, ABS_X, scaled_x);
+    emit(abs_uinp_fd, EV_ABS, ABS_Y, scaled_y);
     emit(abs_uinp_fd, EV_SYN, SYN_REPORT, 0);
 }
 

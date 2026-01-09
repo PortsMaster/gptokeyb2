@@ -42,7 +42,7 @@
 void setupFakeAbsoluteMouseDevice()
 {
     struct uinput_user_dev device;
-    
+
     memset(&device, 0, sizeof(device));
     strncpy(device.name, "Fake Absolute Mouse", UINPUT_MAX_NAME_SIZE);
     device.id.vendor = 0x1235;  /* sample vendor */
@@ -61,28 +61,25 @@ void setupFakeAbsoluteMouseDevice()
     ioctl(fd, UI_SET_EVBIT, EV_SYN);
     ioctl(fd, UI_SET_EVBIT, EV_KEY);
     ioctl(fd, UI_SET_KEYBIT, BTN_LEFT);
+    ioctl(fd, UI_SET_KEYBIT, BTN_TOUCH);
     ioctl(fd, UI_SET_EVBIT, EV_ABS);
     ioctl(fd, UI_SET_ABSBIT, ABS_X);
     ioctl(fd, UI_SET_ABSBIT, ABS_Y);
 
-    // Fake mouse for absolute positioning
-    ioctl(fd, UI_SET_EVBIT, EV_ABS);
-
-    // magical incantations to the absolute pointer gods.
-    // These (width/height/etc) are all arbitrary
+    // Use screen dimensions as ABS range
     device.absmin[ABS_X] = 0;
-    device.absmax[ABS_X] = 1280;
-    device.absfuzz[ABS_X] = 4;
-    device.absflat[ABS_X] = 8;
+    device.absmax[ABS_X] = current_state.absolute_screen_width;
+    device.absfuzz[ABS_X] = 0;
+    device.absflat[ABS_X] = 0;
 
     device.absmin[ABS_Y] = 0;
-    device.absmax[ABS_Y] = 1024;
-    device.absfuzz[ABS_Y] = 4;
-    device.absflat[ABS_Y] = 8;
+    device.absmax[ABS_Y] = current_state.absolute_screen_height;
+    device.absfuzz[ABS_Y] = 0;
+    device.absflat[ABS_Y] = 0;
 
     // Create input device into input sub-system.  UI_DEV_SETUP is too new for arkos
     // kernel so we just write it to the fd
-    
+
     //if (-1 == ioctl(fd, UI_DEV_SETUP, device)) {
     if (-1 == write(fd, &device, sizeof(device))) {
         fprintf(stderr, "Unable to setup abs mouse device structure: %s\n", strerror(errno));

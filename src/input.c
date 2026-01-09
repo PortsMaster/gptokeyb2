@@ -208,7 +208,7 @@ void input_init()
     size_t character_len = strlen(full_set->characters);
     const keyboard_values *keyinfo;
     memset((void*)characters, '\0', sizeof(characters));
-    char find_buff[3] = {0};
+    char find_buff[3] = "\0\0\0";
 
     for (size_t i = 0; i < character_len; i++)
     {
@@ -217,7 +217,7 @@ void input_init()
 
         if (keyinfo == NULL)
         {
-            printf("bad character '%s'\n", keyinfo->str);
+            printf("bad character '%c'\n", full_set->characters[i]);
             continue;
         }
 
@@ -463,7 +463,7 @@ void input_load_word_set(const char *name)
 
     const word_set *temp_wordset = find_word_set(name);;
 
-    if (active_word_set == NULL)
+    if (temp_wordset == NULL)
     {
         fprintf(stderr, "Unknown wordset \"%s\".\n", name);
         return;
@@ -499,8 +499,19 @@ void input_rem_char()
 
 void input_add_char()
 {
-    if (characters[(unsigned char)input_text[current_offset]].keycode == 0)
+    unsigned char c = (unsigned char)input_text[current_offset];
+    short keycode = characters[c].keycode;
+    bool shift    = characters[c].shift;
+
+    // Debug: show what character is being typed and how
+    printf("input_add_char: '%c' (0x%02X) -> keycode=%d shift=%d\n",
+           (c >= 32 && c < 127) ? c : '?', c,
+           keycode ? keycode : characters['?'].keycode,
+           shift ? 1 : 0);
+
+    if (keycode == 0)
     {
+        // Fallback to '?' if the character is unknown
         emitTextInputKey(
             characters['?'].keycode,
             characters['?'].shift);
@@ -508,11 +519,10 @@ void input_add_char()
     else
     {
         emitTextInputKey(
-            characters[(unsigned char)input_text[current_offset]].keycode,
-            characters[(unsigned char)input_text[current_offset]].shift);
+            keycode,
+            shift);
     }
 }
-
 
 void input_dump_state()
 {
@@ -531,12 +541,21 @@ void input_dump_state()
 
 bool _input_add_letter(char letter)
 {
-    if (current_offset >= MAX_TEXT_LENGTH)
+    // Leave room for trailing '\0'
+    if (current_offset >= MAX_TEXT_LENGTH - 1)
         return false;
 
-    input_text[current_offset++] = letter;
+    // 1. Write letter at current position
+    input_text[current_offset] = letter;
 
+    // 2. Emit that character
     input_add_char();
+
+    // 3. Move cursor to "after last char"
+    current_offset++;
+
+    // 4. Maintain proper C-string termination
+    input_text[current_offset] = 0;
 
     return true;
 }
@@ -548,9 +567,10 @@ void _input_rem_letter()
         return;
 
     current_offset--;
+    input_text[current_offset] = 0;
+
     input_rem_char();
 }
-
 
 void input_rem_word()
 {

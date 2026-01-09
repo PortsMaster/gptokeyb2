@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-FROM ubuntu:22.04
+FROM ubuntu:20.04
 
 # Run with: docker buildx build --platform=linux/arm64 --progress=plain -f Dockerfile -t gptokeyb2-build . && docker create --name gptokeyb2_tmp gptokeyb2-build && docker cp gptokeyb2_tmp:/build/gptokeyb2/build/gptokeyb2 ./gptokeyb2 && docker rm gptokeyb2_tmp
 
@@ -36,14 +36,13 @@ RUN ccache --set-config=cache_dir=/root/.ccache && \
 # -------------------------------------------------
 # Fetch sources
 # -------------------------------------------------
-RUN git clone https://github.com/PortsMaster/gptokeyb2.git
+COPY . /build/gptokeyb2/
 
 # -------------------------------------------------
 # Configure (cached)
 # -------------------------------------------------
 WORKDIR /build/gptokeyb2
 
-COPY . /build/gptokeyb2/
 
 RUN --mount=type=cache,target=/root/.ccache \
     cmake -S . -B build \

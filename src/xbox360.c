@@ -102,7 +102,11 @@ void setupFakeXbox360Device()
     UINPUT_SET_ABS_P(&device, ABS_Z, 0, 255, 0, 0);
     UINPUT_SET_ABS_P(&device, ABS_RZ, 0, 255, 0, 0);
 
-    write(fd, &device, sizeof(device));
+    ssize_t written = write(fd, &device, sizeof(device));
+    if (written != sizeof(device)) {
+        perror("write fake xbox360 device");
+//        close(fd);
+    }
 
     if (ioctl(fd, UI_DEV_CREATE)) {
         printf("Unable to create UINPUT device.");

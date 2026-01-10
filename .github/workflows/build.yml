@@ -146,18 +146,18 @@ jobs:
           echo "Staging contents:"
           ls -R staging
 
-      - name: Create Zip Archive
+      # We still create this zip for the 'gh release' step below
+      - name: Create Zip Archive for Release
         run: |
           cd staging
-          # Zip everything in staging into a single flat archive
           zip -r ../gptokeyb2-all.zip ./*
 
-      # This uploads the zip to the GitHub Action Summary page on EVERY build
-      - name: Upload Consolidated Zip
+      # FIX: Upload the FILES, not the zip. GitHub will zip them once.
+      - name: Upload Consolidated Artifact
         uses: actions/upload-artifact@v4
         with:
           name: gptokeyb2-complete-bundle
-          path: gptokeyb2-all.zip
+          path: staging/*
 
       # ----------------------------------------------------------------
       # The following steps ONLY run if manually triggered (workflow_dispatch)

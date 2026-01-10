@@ -174,3 +174,40 @@ Here it is broken down:
    - It inherits mappings from the parent state.
    - The mappings for `x`, `b`, `y`, and `a` change to `p`, `o`, `m`, and `n` respectively when both `hotkey1` and `hotkey2` are held.
 
+## Word sets
+
+It is possible to have text input in the game for naming save game files or entering cheats.
+
+
+```
+[config]
+wordset = cheats "enable_cheats" "set god" "unset god"
+
+[controls]
+overlay = clear
+
+start = hold_state word_input
+back = hold_state text_input
+
+[controls:word_input]
+overlay = clear
+
+wordset = cheats
+right_analog_up = "f1" ; console
+right_analog_left = "prev_word"
+right_analog_right = "next_word"
+right_analog_down = "finish_text"
+
+[controls:text_input]
+# charset = and wordset = can't both be set in the same controls group
+charset = extended
+
+start = pop_state
+up = prev_letter
+down = next_letter
+right = add_letter
+left = "backspace"
+a = "enter"
+b = "backspace"
+
+```

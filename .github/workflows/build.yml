@@ -41,8 +41,17 @@ jobs:
 
       - name: Build ${{ matrix.arch.name }}
         run: |
+          # Tell pkg-config to look in the cross-compile directories
+          export PKG_CONFIG_LIBDIR="/usr/lib/${{ matrix.arch.cross }}/pkgconfig:/usr/share/pkgconfig"
+          
           mkdir build && cd build
-          cmake ../ -GNinja -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/debian-${{ matrix.arch.name }}-gcc-toolchain.cmake -DCMAKE_BUILD_TYPE=Release
+          
+          # Added -DCMAKE_PREFIX_PATH as a backup for find_library() calls not using pkg-config
+          cmake ../ -GNinja \
+            -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/debian-${{ matrix.arch.name }}-gcc-toolchain.cmake \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="/usr/lib/${{ matrix.arch.cross }}"
+            
           cmake --build .
         
       - name: Prepare export

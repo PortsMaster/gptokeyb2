@@ -1,4 +1,4 @@
-name: gptokeyb2 Build
+name: gptokeyb2 Build & Release
 
 on:
   workflow_dispatch:
@@ -10,6 +10,9 @@ on:
     branches: [ "master" ]
     paths-ignore:
       - '**/README.md'
+
+permissions:
+  contents: write
 
 jobs:
   # ----------------------------------------------------------------
@@ -45,7 +48,6 @@ jobs:
       - name: Build ${{ matrix.arch.name }}
         run: |
           mkdir build && cd build
-          # We explicitly define library paths to bypass search issues in the cross-compile toolchain
           cmake ../ -GNinja \
             -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/debian-${{ matrix.arch.name }}-gcc-toolchain.cmake \
             -DCMAKE_BUILD_TYPE=Release \
@@ -90,24 +92,18 @@ jobs:
       - name: Build x86_64
         run: |
           mkdir build && cd build
-          # No toolchain file needed. 
-          # We still hint the include dir because libevdev hides headers in a versioned subfolder.
           cmake ../ -GNinja \
             -DCMAKE_BUILD_TYPE=Release \
             -DLIBEVDEV_INCLUDE_DIR="/usr/include/libevdev-1.0" \
             -DCMAKE_C_FLAGS="-Wno-error=unused-result"
-
           cmake --build .
 
       - name: Prepare export
         run: |
           cd build
-          # Rename libraries and patch dependency links
           patchelf --replace-needed libinterpose.so libinterpose.x86_64.so gptokeyb2
           patchelf --set-soname libinterpose.x86_64.so lib/libinterpose.so
           mv lib/libinterpose.so libinterpose.x86_64.so
-          
-          # Strip and rename executable
           strip gptokeyb2
           mv gptokeyb2 gptokeyb2.x86_64
 
@@ -117,3 +113,91 @@ jobs:
           name: gptokeyb2_x86_64
           path: |
             ${{ github.workspace }}/build/*.x86_64*
+
+  # ----------------------------------------------------------------
+  # JOB 3: Package (Runs on all builds) & Release (Manual Only)
+  # ----------------------------------------------------------------
+  package:
+    needs: [build-arm, build-native]
+    runs-on: ubuntu-latest
+    name: Package Artifacts
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Needed for changelog generation
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Consolidate and Rename
+        run: |
+          mkdir staging
+          
+          # Move files from subfolders to staging root (flattening)
+          cp artifacts/gptokeyb2_arm64/* staging/
+          cp artifacts/gptokeyb2_armhf/* staging/
+          cp artifacts/gptokeyb2_x86_64/* staging/
+          
+          # Rename gptokeyb2.aarch64 -> gptokeyb2 per requirements
+          mv staging/gptokeyb2.aarch64 staging/gptokeyb2
+          
+          echo "Staging contents:"
+          ls -R staging
+
+      - name: Create Zip Archive
+        run: |
+          cd staging
+          # Zip everything in staging into a single flat archive
+          zip -r ../gptokeyb2-all.zip ./*
+
+      # This uploads the zip to the GitHub Action Summary page on EVERY build
+      - name: Upload Consolidated Zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: gptokeyb2-complete-bundle
+          path: gptokeyb2-all.zip
+
+      # ----------------------------------------------------------------
+      # The following steps ONLY run if manually triggered (workflow_dispatch)
+      # ----------------------------------------------------------------
+      
+      - name: Generate Version and Changelog
+        if: github.event_name == 'workflow_dispatch'
+        id: vars
+        run: |
+          # 1. Generate Date Version
+          VERSION=$(date +'%Y.%m.%d-%H%M')
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          
+          # 2. Generate Commit Summary
+          echo "Generating changelog..."
+          
+          # Try to find the last tag
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          
+          if [ -z "$LAST_TAG" ]; then
+            echo "No previous tags found. Showing last 10 commits."
+            echo "## Initial Release or No Tags Found" > release_notes.txt
+            echo "" >> release_notes.txt
+            git log -n 10 --pretty=format:"- %h %s" >> release_notes.txt
+          else
+            echo "Generating diff from $LAST_TAG"
+            echo "## Changes since $LAST_TAG" > release_notes.txt
+            echo "" >> release_notes.txt
+            git log ${LAST_TAG}..HEAD --pretty=format:"- %h %s" >> release_notes.txt
+          fi
+          
+          cat release_notes.txt
+
+      - name: Create GitHub Release
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create ${{ env.VERSION }} \
+            gptokeyb2-all.zip \
+            --title "gptokeyb2 ${{ env.VERSION }}" \
+            --notes-file release_notes.txt \
+            --target ${{ github.sha }}

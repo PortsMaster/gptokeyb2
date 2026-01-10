@@ -12,7 +12,10 @@ on:
       - '**/README.md'
 
 jobs:
-  build:
+  # ----------------------------------------------------------------
+  # JOB 1: Cross-Compilation for ARM (Debian Bullseye Container)
+  # ----------------------------------------------------------------
+  build-arm:
     runs-on: ubuntu-latest
     container:
       image: debian:bullseye
@@ -42,7 +45,7 @@ jobs:
       - name: Build ${{ matrix.arch.name }}
         run: |
           mkdir build && cd build
-          
+          # We explicitly define library paths to bypass search issues in the cross-compile toolchain
           cmake ../ -GNinja \
             -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/debian-${{ matrix.arch.name }}-gcc-toolchain.cmake \
             -DCMAKE_BUILD_TYPE=Release \
@@ -50,7 +53,6 @@ jobs:
             -DLIBEVDEV_INCLUDE_DIR="/usr/include/libevdev-1.0" \
             -DSDL2_LIBRARY="/usr/lib/${{ matrix.arch.cross }}/libSDL2.so" \
             -DSDL2_INCLUDE_DIR="/usr/include/SDL2"
-            
           cmake --build .
         
       - name: Prepare export
@@ -69,3 +71,47 @@ jobs:
           path: |
             ${{ github.workspace }}/build/*.${{ matrix.arch.executable }}*
 
+  # ----------------------------------------------------------------
+  # JOB 2: Native Build for x86_64 (Ubuntu 24.04)
+  # ----------------------------------------------------------------
+  build-native:
+    runs-on: ubuntu-24.04
+    name: Ubuntu x86_64
+    steps:
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y libsdl2-dev libevdev-dev cmake ninja-build patchelf build-essential git
+
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build x86_64
+        run: |
+          mkdir build && cd build
+          # No toolchain file needed. 
+          # We still hint the include dir because libevdev hides headers in a versioned subfolder.
+          cmake ../ -GNinja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DLIBEVDEV_INCLUDE_DIR="/usr/include/libevdev-1.0"
+          cmake --build .
+
+      - name: Prepare export
+        run: |
+          cd build
+          # Rename libraries and patch dependency links
+          patchelf --replace-needed libinterpose.so libinterpose.x86_64.so gptokeyb2
+          patchelf --set-soname libinterpose.x86_64.so lib/libinterpose.so
+          mv lib/libinterpose.so libinterpose.x86_64.so
+          
+          # Strip and rename executable
+          strip gptokeyb2
+          mv gptokeyb2 gptokeyb2.x86_64
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: gptokeyb2_x86_64
+          path: |
+            ${{ github.workspace }}/build/*.x86_64*

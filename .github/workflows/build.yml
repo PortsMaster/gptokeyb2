@@ -94,7 +94,9 @@ jobs:
           # We still hint the include dir because libevdev hides headers in a versioned subfolder.
           cmake ../ -GNinja \
             -DCMAKE_BUILD_TYPE=Release \
-            -DLIBEVDEV_INCLUDE_DIR="/usr/include/libevdev-1.0"
+            -DLIBEVDEV_INCLUDE_DIR="/usr/include/libevdev-1.0" \
+            -DCMAKE_C_FLAGS="-Wno-error=unused-result"
+
           cmake --build .
 
       - name: Prepare export

@@ -383,6 +383,12 @@ int main(int argc, char* argv[])
         return -1;
     }
 
+    const char* db_file = SDL_getenv("SDL_GAMECONTROLLERCONFIG_FILE");
+    if (db_file)
+    {
+        SDL_GameControllerAddMappingsFromFile(db_file);
+    }
+
     // Create fake input devices
     if (config_mode || xbox360_mode)
     {
@@ -405,12 +411,6 @@ int main(int argc, char* argv[])
             setupFakeAbsoluteMouseDevice();
         }
 
-    }
-
-    const char* db_file = SDL_getenv("SDL_GAMECONTROLLERCONFIG_FILE");
-    if (db_file)
-    {
-        SDL_GameControllerAddMappingsFromFile(db_file);
     }
 
     SDL_Event event;

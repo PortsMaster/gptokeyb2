@@ -58,12 +58,12 @@ void handleInputEvent(const SDL_Event *event)
         break;
 
     case SDL_CONTROLLERAXISMOTION:
-        if (xbox360_mode)
         {
-            handleEventAxisFakeXbox360Device(event);
-        }
-        else
-        {
+            if (xbox360_mode)
+            {
+                handleEventAxisFakeXbox360Device(event);
+            }
+
             handleEventAxisFakeKeyboardMouseDevice(event);
         }
         break;
@@ -76,14 +76,16 @@ void handleInputEvent(const SDL_Event *event)
                 int controller_fd = interpose_get_fd();
                 SDL_Joystick *joystick = SDL_GameControllerGetJoystick(controller);
                 const char *name = SDL_JoystickName(joystick);
-                printf("Joystick %i has game controller name '%s': %d\n", 0, name, controller_fd);
+                printf("Joystick %i has game controller name '%s': %d", 0, name, controller_fd);
                 if (strcmp(name, XBOX_CONTROLLER_NAME) != 0)
                 {
+                    printf(" opened.\n");
                     SDL_GameControllerOpen(event->cdevice.which);
                     controller_add_fd(event->cdevice.which, controller_fd);
                 }
                 else
                 {
+                    printf(" closed because it's our own controller.\n");
                     SDL_GameControllerClose(controller);
                 }
             }

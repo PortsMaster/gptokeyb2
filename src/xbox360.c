@@ -57,9 +57,9 @@ void setupFakeXbox360Device()
     
     memset(&device, 0, sizeof(device));
     strncpy(device.name, XBOX_CONTROLLER_NAME, UINPUT_MAX_NAME_SIZE);
-    device.id.vendor = 0x045e;  /* sample vendor */
-    device.id.product = 0x028e; /* sample product */
-    device.id.version = 1;
+    device.id.vendor = 0x045e;
+    device.id.product = 0x028e;
+    device.id.version = 0x0104;
     device.id.bustype = BUS_USB;
 
     int fd = xbox_uinp_fd = open("/dev/uinput", O_WRONLY | O_NONBLOCK);

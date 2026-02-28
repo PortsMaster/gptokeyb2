@@ -389,6 +389,8 @@ int main(int argc, char* argv[])
         SDL_GameControllerAddMappingsFromFile(db_file);
     }
 
+    recordExistingControllers();
+
     // Create fake input devices
     if (config_mode || xbox360_mode)
     {

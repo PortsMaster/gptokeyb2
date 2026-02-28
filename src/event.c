@@ -37,6 +37,37 @@
 
 #include "gptokeyb2.h"
 
+static SDL_JoystickID existing_controllers[MAX_CONTROLLERS];
+static int num_existing_controllers = 0;
+static SDL_JoystickID virtual_controller_id = -1;
+
+// Helper function to check if an ID exists in the array
+bool isExistingController(SDL_JoystickID id) {
+    for (int i = 0; i < num_existing_controllers; i++) {
+        if (existing_controllers[i] == id) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Record controllers before initializing virtual controller so that later the virtual controller can be detected when checked against this list
+void recordExistingControllers() {
+    num_existing_controllers = 0;
+
+    int num_joysticks = SDL_NumJoysticks();
+    for (int i = 0; i < num_joysticks && num_existing_controllers < MAX_CONTROLLERS; i++) {
+        SDL_GameController* controller = SDL_GameControllerOpen(i);
+        if (controller) {
+            SDL_Joystick* joystick = SDL_GameControllerGetJoystick(controller);
+            SDL_JoystickID id = SDL_JoystickInstanceID(joystick);
+            existing_controllers[num_existing_controllers++] = id;
+            SDL_GameControllerClose(controller);
+        }
+    }
+
+    printf("Recorded %d existing controllers\n", num_existing_controllers);
+}
 
 void handleInputEvent(const SDL_Event *event)
 {
@@ -75,18 +106,18 @@ void handleInputEvent(const SDL_Event *event)
             {
                 int controller_fd = interpose_get_fd();
                 SDL_Joystick *joystick = SDL_GameControllerGetJoystick(controller);
+                SDL_JoystickID instance_id = SDL_JoystickInstanceID(joystick);
                 const char *name = SDL_JoystickName(joystick);
                 printf("Joystick %i has game controller name '%s': %d", 0, name, controller_fd);
-                if (strcmp(name, XBOX_CONTROLLER_NAME) != 0)
-                {
-                    printf(" opened.\n");
-                    SDL_GameControllerOpen(event->cdevice.which);
-                    controller_add_fd(event->cdevice.which, controller_fd);
+                if (xbox360_mode && ((virtual_controller_id == -1 && !isExistingController(instance_id)) || instance_id == virtual_controller_id) ) {
+                    virtual_controller_id = instance_id;
+                    printf(" closed because it's our own controller.\n");
+                    SDL_GameControllerClose(controller);
                 }
                 else
                 {
-                    printf(" closed because it's our own controller.\n");
-                    SDL_GameControllerClose(controller);
+                    printf(" opened.\n");
+                    controller_add_fd(event->cdevice.which, controller_fd);
                 }
             }
         }

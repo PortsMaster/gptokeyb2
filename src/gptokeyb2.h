@@ -82,6 +82,7 @@
 #define XBOX_CONTROLLER_NAME "Microsoft X-Box 360 pad"
 
 // surely this is enough. :TurtleThink: 
+#define MAX_CONTROLLERS 64
 #define MAX_CONTROL_NAME 64
 
 // THIS IS REDICULOUS, STOP IT.
@@ -551,6 +552,8 @@ void controller_add_fd(Sint32 which, int fd);
 void controller_remove_fd(Sint32 which);
 
 // event.c
+bool isExistingController(SDL_JoystickID id);
+void recordExistingControllers();
 void handleInputEvent(const SDL_Event *event);
 
 // keyboard.c

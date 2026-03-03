@@ -316,7 +316,10 @@ void emit(int fd, int type, int code, int val)
     ev.time.tv_sec = 0;
     ev.time.tv_usec = 0;
 
-    write(fd, &ev, sizeof(ev));
+    ssize_t rc = write(fd, &ev, sizeof(ev));
+    if (rc != sizeof(ev)) {
+        perror("emit: write");
+    }
 }
 
 

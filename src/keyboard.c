@@ -126,6 +126,7 @@ void setupFakeKeyboardMouseDevice()
         ioctl(fd, UI_SET_RELBIT, REL_Y) ||
         ioctl(fd, UI_SET_KEYBIT, BTN_LEFT) ||
         ioctl(fd, UI_SET_KEYBIT, BTN_RIGHT) ||
+        ioctl(fd, UI_SET_KEYBIT, BTN_MIDDLE) ||
         // FUCKING SCHROLL WHEEL
         ioctl(fd, UI_SET_RELBIT, REL_WHEEL)
         ) {

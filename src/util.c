@@ -485,11 +485,11 @@ bool process_with_kill(const char *process_name, bool use_sudo)
     char temp_buffer[KILL_BUFFER];
     bool status = false;
 
-    snprintf(temp_buffer, KILL_BUFFER, "ps | grep '%s' | grep -v grep | awk '{print $1}'", process_name);
+    snprintf(temp_buffer, KILL_BUFFER, "pgrep -f '%s'", process_name);
 
     FILE *fp = popen(temp_buffer, "r");
     if (fp == NULL) {
-        perror("Error executing ps command");
+        perror("Error executing pgrep command");
         return false;
     }
 

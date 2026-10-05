@@ -37,6 +37,8 @@ jobs:
     steps:
       - name: Install ${{ matrix.arch.name }} dependencies
         run: |
+          # Bullseye has moved to archive.debian.org; deb.debian.org no longer serves its security updates.
+          sed -i -e 's|deb.debian.org|archive.debian.org|g' -e 's|security.debian.org|archive.debian.org|g' /etc/apt/sources.list
           dpkg --add-architecture ${{ matrix.arch.name }}
           apt update
           apt install -y --no-install-recommends python3 git build-essential patchelf linux-libc-dev-${{ matrix.arch.name }}-cross gcc-${{ matrix.arch.cross }} libsdl2-dev:${{ matrix.arch.name }} libevdev-dev:${{ matrix.arch.name }} ca-certificates cmake ninja-build

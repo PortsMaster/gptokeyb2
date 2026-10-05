@@ -41,6 +41,8 @@
 
 #define MAX_PROCESS_NAME 64
 
+#define GPTK2_OPTIONS "vk1g:hdD:xp:c:ZXPH:s:"
+
 #ifndef MAX_PATH
 #define MAX_PATH 1024
 #endif
@@ -61,6 +63,8 @@ char user_config_file[MAX_PATH];
 
 char game_prefix[MAX_PROCESS_NAME] = "";
 char kill_process_name[MAX_PROCESS_NAME] = "";
+
+Uint32 debug_flags = DBG_NONE;
 
 
 gptokeyb_config *default_config=NULL;
@@ -148,10 +152,24 @@ int main(int argc, char* argv[])
         }
     }
 
-    while ((opt = getopt(argc, argv, "vk1g:hdxp:c:ZXPH:s:")) != -1)
+    // Parse debug categories first so they apply to config files loaded by -c.
+    opterr = 0;
+    while ((opt = getopt(argc, argv, GPTK2_OPTIONS)) != -1)
+    {
+        if (opt == 'D')
+            debug_parse(optarg);
+    }
+    opterr = 1;
+    optind = 1;
+
+    while ((opt = getopt(argc, argv, GPTK2_OPTIONS)) != -1)
     {
         switch (opt)
         {
+        case 'D':
+            // handled above.
+            break;
+
         case 'k':
         case '1':
             // do nothing.
@@ -248,7 +266,7 @@ int main(int argc, char* argv[])
                 fprintf(stderr, "\n");
             }
 
-            fprintf(stderr, "Usage: %s <program> [-dPXZ] [-H hotkey] [-c <config.ini>] [-p control_mode]\n",
+            fprintf(stderr, "Usage: %s <program> [-dPXZ] [-D debug] [-H hotkey] [-c <config.ini>] [-p control_mode]\n",
                 argv[0]);
             fprintf(stderr, "\n");
             fprintf(stderr, "Args:\n");
@@ -262,6 +280,7 @@ int main(int argc, char* argv[])
             fprintf(stderr, "  -p  \"control\"       - what control mode to start in.\n");
             fprintf(stderr, "\n");
             fprintf(stderr, "  -d                  - dump config parsed.\n");
+            fprintf(stderr, "  -D  \"categories\"    - comma separated debug output: states, gamepad, keyboard, config, all.\n");
             fprintf(stderr, "  -v                  - print version and quit.");
             fprintf(stderr, "\n");
             return 1;
@@ -468,7 +487,7 @@ int main(int argc, char* argv[])
 
             if (mouse_x != 0 || mouse_y != 0) {
                 mouse_moved=true;
-                GPTK2_DEBUG("relative mouse move %d %d\n", mouse_x, mouse_y);
+                GPTK2_DEBUG(DBG_KEYBOARD, "relative mouse move %d %d\n", mouse_x, mouse_y);
             }
         }
 

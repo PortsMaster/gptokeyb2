@@ -41,6 +41,22 @@ strip gptokeyb2
 kill -9 $(pidof gptokeyb2)
 ```
 
+### Debugging
+
+Debug output is off by default. Enable it with `-D` and a comma separated list of categories:
+
+| Category   | Shows                                              |
+|------------|----------------------------------------------------|
+| `states`   | control state changes (push/pop/set/hold) and which state a button resolved from |
+| `gamepad`  | gamepad button / analog-direction presses and releases |
+| `keyboard` | emitted key presses/releases and mouse movement    |
+| `config`   | config file parsing, including unknown keys        |
+| `all`      | everything                                         |
+
+```bash
+./gptokeyb2 "program" -c "controls.ini" -D states,keyboard
+```
+
 ### Complex Example:
 
 ```ini
@@ -49,6 +65,7 @@ deadzone_triggers = 3000
 mouse_scale = 6114
 mouse_delay = 16
 mouse_slow_scale = 30
+dpad_mouse_step = 5
 
 deadzone_mode = axial
 deadzone = 1000

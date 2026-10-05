@@ -62,11 +62,19 @@
 
 #define GPTK2_DEBUG_ENABLED
 
-// DEBUGGAH
+// DEBUGGAH -- categories are selected at runtime with -D
+#define DBG_NONE     0x00
+#define DBG_STATES   0x01 // fsm state changes
+#define DBG_GAMEPAD  0x02 // gamepad input
+#define DBG_KEYBOARD 0x04 // keyboard / mouse output
+#define DBG_CONFIG   0x08 // config parsing
+#define DBG_ALL      0xFF
+
 #ifdef GPTK2_DEBUG_ENABLED
-#define GPTK2_DEBUG(fmt, ...) printf(fmt, ##__VA_ARGS__)
+#define GPTK2_DEBUG(cat, fmt, ...) \
+    do { if (debug_flags & (cat)) printf(fmt, ##__VA_ARGS__); } while (0)
 #else
-#define GPTK2_DEBUG(fmt, ...) ((void)0)
+#define GPTK2_DEBUG(cat, fmt, ...) ((void)0)
 #endif
 
 #ifndef SDL_DEFAULT_REPEAT_DELAY
@@ -421,6 +429,8 @@ extern char kill_process_name[];
 
 extern char game_prefix[];
 
+extern Uint32 debug_flags;
+
 // config.c
 void config_init();
 void config_quit();
@@ -475,6 +485,8 @@ int strcasecmp(const char *s1, const char *s2);
 int strncasecmp(const char *s1, const char *s2, size_t n);
 
 bool process_kill();
+
+void debug_parse(const char *categories);
 
 void string_init();
 void string_quit();

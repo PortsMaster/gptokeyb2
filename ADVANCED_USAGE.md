@@ -69,6 +69,7 @@ deadzone_x = 1000
 deadzone_y = 1000
 deadzone_triggers = 3000
 dpad_mouse_normalize = true
+dpad_mouse_step = 5
 
 [controls]
 a = "mouse_left"

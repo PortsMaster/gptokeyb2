@@ -1406,6 +1406,13 @@ static int config_ini_handler(
         }
         else if (strcaseendswith(name, "_hk"))
         {
+            if (gptk_hk_fix_offset >= GPTK_HK_FIX_MAX)
+            {
+                fprintf(stderr, "too many _hk lines, ignoring %s = %s\n", name, value);
+                tokens_free(token_state);
+                return 1;
+            }
+
             char *temp = (char*)gptk_malloc(GPTK_HK_FIX_MAX_LINE);
 
             snprintf(temp, GPTK_HK_FIX_MAX_LINE, "%s=%s", name, value);

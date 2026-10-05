@@ -43,7 +43,7 @@ bool current_left_analog_as_mouse = false;
 bool current_right_analog_as_mouse = false;
 bool current_left_analog_as_absolute_mouse = false;
 bool current_right_analog_as_absolute_mouse = false;
-bool current_mouse_wheel_amount = DEFAULT_MOUSE_WHEEL_AMOUNT;
+int current_mouse_wheel_amount = DEFAULT_MOUSE_WHEEL_AMOUNT;
 
 bool exclusive_mode = false;
 
@@ -293,7 +293,7 @@ void pop_state()
 
 bool is_pressed(int btn)
 {   // returns tree if button is down
-    if (btn < 0 || btn > GBTN_MAX)
+    if (btn < 0 || btn >= GBTN_MAX)
         return false;
 
     return (current_state.pressed & (1<<btn)) != 0;
@@ -301,7 +301,7 @@ bool is_pressed(int btn)
 
 bool was_pressed(int btn)
 {   // this will only activate once per button press
-    if (btn < 0 || btn > GBTN_MAX)
+    if (btn < 0 || btn >= GBTN_MAX)
         return false;
 
     return (((current_state.pressed & (1<<btn)) != 0) && ((current_state.last_pressed & (1<<btn)) == 0));
@@ -309,7 +309,7 @@ bool was_pressed(int btn)
 
 bool was_released(int btn)
 {   // will only activate if the button was released
-    if (btn < 0 || btn > GBTN_MAX)
+    if (btn < 0 || btn >= GBTN_MAX)
         return false;
 
     return (((current_state.pressed & (1<<btn)) == 0) && ((current_state.last_pressed & (1<<btn)) != 0));
@@ -370,10 +370,36 @@ void state_update()
 }
 
 
+int state_repeat_timeout()
+{   // milliseconds until the next button repeat is due, or -1 if nothing is repeating.
+    Uint32 current_ticks = SDL_GetTicks();
+    int timeout = -1;
+
+    for (int btn=0; btn < GBTN_MAX; btn++)
+    {
+        if ((current_state.in_repeat & (1<<btn)) == 0)
+            continue;
+
+        if (!is_pressed(btn))
+            continue;
+
+        Sint32 remaining = (Sint32)(current_state.next_repeat[btn] - current_ticks);
+
+        if (remaining < 0)
+            remaining = 0;
+
+        if (timeout < 0 || remaining < timeout)
+            timeout = remaining;
+    }
+
+    return timeout;
+}
+
+
 void state_change_update()
 {   // check as mouse_move and input set stuff.
 
-    #define NOT_FOUND_DPADS (!found_dpad_as_mouse || !found_left_analog_as_mouse || !found_right_analog_as_mouse || !found_left_analog_as_absolute_mouse || !found_right_analog_as_mouse)
+    #define NOT_FOUND_DPADS (!found_dpad_as_mouse || !found_left_analog_as_mouse || !found_right_analog_as_mouse || !found_left_analog_as_absolute_mouse || !found_right_analog_as_absolute_mouse)
 
     #define NOT_FOUND_INPUT_SETS ((found_charset == NULL) && (found_wordset == NULL))
 

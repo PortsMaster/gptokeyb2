@@ -438,6 +438,7 @@ int main(int argc, char* argv[])
     int mouse_x=0;
     int mouse_y=0;
     bool mouse_moved=false;
+    int repeat_timeout;
     vector2d mouse_move;
     float slow_scale = (100.0 / (float)(current_state.mouse_slow_scale));
 
@@ -522,6 +523,11 @@ int main(int argc, char* argv[])
             // sleep.
             // TODO: FIX ME
             SDL_Delay(current_state.mouse_delay);
+        }
+        else if ((repeat_timeout = state_repeat_timeout()) >= 0) {
+            // A held button is repeating, wake up in time for the next repeat even without new events.
+            if (SDL_WaitEventTimeout(&event, repeat_timeout))
+                handleInputEvent(&event);
         }
         else {
             // GPTK2_DEBUG("-- WAIT FOR EVENT --\n");

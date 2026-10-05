@@ -215,6 +215,8 @@ void controllers_disable_exclusive()
 
 void push_temp_state(gptokeyb_config *new_config, int btn)
 {
+    GPTK2_DEBUG(DBG_STATES, "hold_state: %s (%s)\n", new_config->name, gbtn_names[btn]);
+
     config_temp_stack[btn] = new_config;
     config_temp_stack_order[btn] = ++config_temp_stack_order_id;
 
@@ -225,6 +227,10 @@ void push_temp_state(gptokeyb_config *new_config, int btn)
 void pop_temp_state(int btn)
 {
     bool all_done = true;
+
+    if (config_temp_stack[btn] != NULL)
+        GPTK2_DEBUG(DBG_STATES, "release_state: %s (%s)\n", config_temp_stack[btn]->name, gbtn_names[btn]);
+
     config_temp_stack[btn] = NULL;
     config_temp_stack_order[btn] = 0;
 
@@ -256,13 +262,7 @@ void push_state(gptokeyb_config *new_config)
         return;
     }
 
-#ifdef GPTK2_DEBUG_ENABLED
-    for (int i = 0; i < gptokeyb_config_depth; i++) {
-        printf("  ");
-    }
-
-    printf("push_state: %s\n", new_config->name);
-#endif
+    GPTK2_DEBUG(DBG_STATES, "%*spush_state: %s\n", gptokeyb_config_depth * 2, "", new_config->name);
 
     config_stack[++gptokeyb_config_depth] = new_config;
 
@@ -271,12 +271,7 @@ void push_state(gptokeyb_config *new_config)
 
 void set_state(gptokeyb_config *new_config)
 {
-#ifdef GPTK2_DEBUG_ENABLED
-    for (int i = 0; i < gptokeyb_config_depth; i++) {
-        printf("  ");
-    }
-    printf("set_state: %s\n", new_config->name);
-#endif
+    GPTK2_DEBUG(DBG_STATES, "%*sset_state: %s\n", gptokeyb_config_depth * 2, "", new_config->name);
 
     config_stack[gptokeyb_config_depth] = new_config;
 
@@ -288,12 +283,7 @@ void pop_state()
     if (gptokeyb_config_depth == 0)
         return;
 
-#ifdef GPTK2_DEBUG_ENABLED
-    for (int i = 0; i < gptokeyb_config_depth; i++) {
-        printf("  ");
-    }
-    printf("pop_state: %s\n", config_stack[gptokeyb_config_depth]->name);
-#endif
+    GPTK2_DEBUG(DBG_STATES, "%*spop_state: %s\n", gptokeyb_config_depth * 2, "", config_stack[gptokeyb_config_depth]->name);
 
     gptokeyb_config_depth--;
 
@@ -588,7 +578,7 @@ const gptokeyb_button *state_button(int btn)
             if (current->button[btn].action == ACT_PARENT)
                 continue;
 
-            GPTK2_DEBUG("found temp[%s] -> %s\n", gbtn_names[sbtn], gbtn_names[btn]);
+            GPTK2_DEBUG(DBG_STATES, "found temp[%s] -> %s\n", gbtn_names[sbtn], gbtn_names[btn]);
 
             return &current->button[btn];
         }
@@ -607,7 +597,7 @@ const gptokeyb_button *state_button(int btn)
 
         if (button->action != ACT_PARENT)
         {
-            GPTK2_DEBUG("found stack[%d] -> %s\n", current_depth, gbtn_names[btn]);
+            GPTK2_DEBUG(DBG_STATES, "found stack[%d] -> %s\n", current_depth, gbtn_names[btn]);
             return button;
         }
 
@@ -631,7 +621,7 @@ void update_button(int btn, bool pressed)
 
     if (was_pressed(btn))
     {
-        GPTK2_DEBUG("%s -> %s\n", gbtn_names[btn], (pressed ? "pressed" : "released"));
+        GPTK2_DEBUG(DBG_GAMEPAD, "%s -> pressed\n", gbtn_names[btn]);
 
         if ((current_state.in_repeat & btn_mask) != 0)
         {   // if we're in repeat we get the held button.
@@ -673,7 +663,7 @@ void update_button(int btn, bool pressed)
 
             if (button->keycode != 0)
             {
-                GPTK2_DEBUG("PRESSED '%s' -> '%s'\n", gbtn_names[btn], find_keycode(button->keycode));
+                GPTK2_DEBUG(DBG_KEYBOARD, "PRESSED '%s' -> '%s'\n", gbtn_names[btn], find_keycode(button->keycode));
                 emitKey(kb_uinp_fd, button->keycode, true, button->modifier);
 
                 if (button->repeat && !(current_state.in_repeat & btn_mask))
@@ -763,12 +753,14 @@ void update_button(int btn, bool pressed)
 
         if (button->keycode != 0)
         {
-            GPTK2_DEBUG("PRESSED '%s' -> '%s'\n", gbtn_names[btn], find_keycode(button->keycode));
+            GPTK2_DEBUG(DBG_KEYBOARD, "PRESSED '%s' -> '%s'\n", gbtn_names[btn], find_keycode(button->keycode));
             emitKey(kb_uinp_fd, button->keycode, true, button->modifier);
         }
     }
     else if (was_released(btn))
     {
+        GPTK2_DEBUG(DBG_GAMEPAD, "%s -> released\n", gbtn_names[btn]);
+
         button = current_state.button_held[btn];
 
         // Not repeating this button, lets clear the held button
@@ -777,8 +769,6 @@ void update_button(int btn, bool pressed)
 
         if (button == NULL)
             return;
-
-        // GPTK2_DEBUG("%s -> %s\n", gbtn_names[btn], (pressed ? "pressed" : "released"));
 
         if ((current_state.pop_held & btn_mask) != 0)
         {
@@ -793,7 +783,7 @@ void update_button(int btn, bool pressed)
 
         if (button->keycode != 0)
         {
-            GPTK2_DEBUG("RELEASE '%s' -> '%s'\n", gbtn_names[btn], find_keycode(button->keycode));
+            GPTK2_DEBUG(DBG_KEYBOARD, "RELEASE '%s' -> '%s'\n", gbtn_names[btn], find_keycode(button->keycode));
             emitKey(kb_uinp_fd, button->keycode, false, button->modifier);
         }
     }

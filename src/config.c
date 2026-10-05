@@ -306,6 +306,7 @@ void config_dump()
     printf("deadzone_y = %d\n", current_state.deadzone_y);
     printf("deadzone_triggers = %d\n", current_state.deadzone_triggers);
     printf("dpad_mouse_normalize = %s\n", (current_state.dpad_mouse_normalize ? "true" : "false" ));
+    printf("dpad_mouse_step = %d\n", current_state.dpad_mouse_step);
     printf("absolute_center_x = %d\n", current_state.absolute_center_x);
     printf("absolute_center_y = %d\n", current_state.absolute_center_y);
     printf("absolute_step = %d\n", current_state.absolute_step);
@@ -715,6 +716,9 @@ void set_cfg_config(const char *name, const char *value, token_ctx *token_state)
     else if (strcasecmp(name, "dpad_mouse_normalize") == 0)
         current_state.dpad_mouse_normalize = atob_default(value, true);
 
+    else if (strcasecmp(name, "dpad_mouse_step") == 0)
+        current_state.dpad_mouse_step = atoi_between(value, 1, 100, 5);
+
     else if (strcasecmp(name, "mouse_delay") == 0)
         current_state.mouse_delay = atoi_between(value, 16, 3000, SDL_DEFAULT_REPEAT_DELAY);
 
@@ -793,12 +797,10 @@ void set_cfg_config(const char *name, const char *value, token_ctx *token_state)
         free(words_name);
         return;
     }
-#ifdef GPTK2_DEBUG_ENABLED
     else
     {
-        GPTK2_DEBUG("# unknown global %s = %s\n", name, value);
+        GPTK2_DEBUG(DBG_CONFIG, "# unknown global %s = %s\n", name, value);
     }
-#endif
 }
 
 static inline void set_btn_as_mouse(int btn, gptokeyb_config *config, int mode)
@@ -1277,7 +1279,7 @@ static int config_ini_handler(
 
         if (strcasecmp(section, "config") == 0)
         {
-            GPTK2_DEBUG("CONFIG\n");
+            GPTK2_DEBUG(DBG_CONFIG, "CONFIG\n");
             config->state = CFG_CONFIG;
         }
         else if (strlen(game_prefix) > 0 && strcasestartswith(section, "config:") == true)
@@ -1501,12 +1503,12 @@ static int config_ini_handler(
         }
         else
         {
-            GPTK2_DEBUG("# unknown config %s = %s\n", name, value);
+            GPTK2_DEBUG(DBG_CONFIG, "# unknown config %s = %s\n", name, value);
         }
     }
     else
     {
-        GPTK2_DEBUG("?: %s: %s\n", name, value);
+        GPTK2_DEBUG(DBG_CONFIG, "?: %s: %s\n", name, value);
     }
 
     tokens_free(token_state);

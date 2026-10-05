@@ -556,6 +556,56 @@ bool process_kill()
 }
 
 
+static const struct {
+    const char *name;
+    Uint32 flag;
+} debug_categories[] = {
+    {"none",     DBG_NONE},
+    {"states",   DBG_STATES},
+    {"gamepad",  DBG_GAMEPAD},
+    {"keyboard", DBG_KEYBOARD},
+    {"config",   DBG_CONFIG},
+    {"all",      DBG_ALL},
+};
+
+
+void debug_parse(const char *categories)
+{   // parse a comma separated list of debug categories, eg: "states,gamepad"
+    char buffer[256];
+    char *save_ptr = NULL;
+
+    strncpy(buffer, categories, sizeof(buffer) - 1);
+    buffer[sizeof(buffer) - 1] = '\0';
+
+    for (char *name = strtok_r(buffer, ",", &save_ptr); name != NULL; name = strtok_r(NULL, ",", &save_ptr))
+    {
+        bool found = false;
+
+        for (size_t i=0; i < (sizeof(debug_categories) / sizeof(debug_categories[0])); i++)
+        {
+            if (strcasecmp(name, debug_categories[i].name) == 0)
+            {
+                if (debug_categories[i].flag == DBG_NONE)
+                    debug_flags = DBG_NONE;
+                else
+                    debug_flags |= debug_categories[i].flag;
+
+                found = true;
+                break;
+            }
+        }
+
+        if (!found)
+            fprintf(stderr, "unknown debug category '%s', expected: states, gamepad, keyboard, config, all, none\n", name);
+    }
+
+#ifndef GPTK2_DEBUG_ENABLED
+    if (debug_flags != DBG_NONE)
+        fprintf(stderr, "debug output was disabled at compile time.\n");
+#endif
+}
+
+
 string_reg *string_reg_create(const char *string)
 {
     if (string == NULL)

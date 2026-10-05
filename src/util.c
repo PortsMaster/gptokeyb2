@@ -480,10 +480,53 @@ bool process_with_pkill(const char *process_name, bool use_sudo)
 }
 
 
+static int process_parent(int pid)
+{   // parent pid of pid, or -1 if unknown.
+    char path[64];
+    char stat_buffer[512];
+
+    snprintf(path, sizeof(path), "/proc/%d/stat", pid);
+
+    FILE *fp = fopen(path, "r");
+    if (fp == NULL)
+        return -1;
+
+    size_t len = fread(stat_buffer, 1, sizeof(stat_buffer) - 1, fp);
+    fclose(fp);
+    stat_buffer[len] = '\0';
+
+    // The process name can contain spaces and brackets, the parent pid comes after the last ')'.
+    char *after_name = strrchr(stat_buffer, ')');
+    int ppid = -1;
+
+    if (after_name == NULL || sscanf(after_name + 1, " %*c %d", &ppid) != 1)
+        return -1;
+
+    return ppid;
+}
+
+
+static bool process_is_ours(int pid)
+{   // pgrep -f also matches gptokeyb2 itself (its command line contains the
+    // process name), anything that started it, and the popen shell running pgrep.
+    if (process_parent(pid) == getpid())
+        return true;
+
+    for (int ancestor = getpid(); ancestor > 1; ancestor = process_parent(ancestor))
+    {
+        if (ancestor == pid)
+            return true;
+    }
+
+    return false;
+}
+
+
 bool process_with_kill(const char *process_name, bool use_sudo)
 {
     char temp_buffer[KILL_BUFFER];
     bool status = false;
+    bool found = false;
 
     snprintf(temp_buffer, KILL_BUFFER, "pgrep -f '%s'", process_name);
 
@@ -495,13 +538,14 @@ bool process_with_kill(const char *process_name, bool use_sudo)
 
     char pid_str[32];
 
-    if (fgets(pid_str, sizeof(pid_str), fp) != NULL)
+    while (fgets(pid_str, sizeof(pid_str), fp) != NULL)
     {
-        // Trim the newline character
-        pid_str[strcspn(pid_str, "\n")] = 0;
-
-        // Convert string to integer
         int pid = atoi(pid_str);
+
+        if (pid <= 0 || process_is_ours(pid))
+            continue;
+
+        found = true;
 
         // Kill the process
         if (use_sudo)
@@ -509,10 +553,10 @@ bool process_with_kill(const char *process_name, bool use_sudo)
         else
             snprintf(temp_buffer, KILL_BUFFER, "kill -9 %d", pid);
 
-        int status = system(temp_buffer);
-        if (status == -1)
+        int ret = system(temp_buffer);
+        if (ret != 0)
         {
-            perror("Error executing kill command");
+            fprintf(stderr, "Unable to kill '%s' with PID %d.\n", process_name, pid);
         }
         else
         {
@@ -520,7 +564,8 @@ bool process_with_kill(const char *process_name, bool use_sudo)
             printf("Process with name '%s' and PID %d killed successfully.\n", process_name, pid);
         }
     }
-    else
+
+    if (!found)
     {
         printf("No process with name '%s' found.\n", process_name);
     }
@@ -533,10 +578,10 @@ bool process_with_kill(const char *process_name, bool use_sudo)
 
 void process_with_pc_quit()
 {
-    emitKey(kb_uinp_fd, KEY_F4, true, KEY_LEFTALT);
+    emitKey(kb_uinp_fd, KEY_F4, true, MOD_ALT);
     SDL_Delay(15);
 
-    emitKey(kb_uinp_fd, KEY_F4, false, KEY_LEFTALT);
+    emitKey(kb_uinp_fd, KEY_F4, false, MOD_ALT);
     SDL_Delay(15);
 }
 

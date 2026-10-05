@@ -409,7 +409,7 @@ extern int gptokeyb_config_depth;
 extern bool current_dpad_as_mouse;
 extern bool current_left_analog_as_mouse;
 extern bool current_right_analog_as_mouse;
-extern bool current_mouse_wheel_amount;
+extern int current_mouse_wheel_amount;
 extern bool current_left_analog_as_absolute_mouse;
 extern bool current_right_analog_as_absolute_mouse;
 
@@ -550,6 +550,7 @@ void update_button(int btn, bool pressed);
 void state_init();
 void state_quit();
 void state_update();
+int state_repeat_timeout();
 gptokeyb_config *state_active();
 
 void push_state(gptokeyb_config *);
